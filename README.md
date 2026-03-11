@@ -19,15 +19,16 @@ Dieses AddOn ermöglicht es, YForm-Datensätze (z.B. News, Produkte, Mitarbeiter
 
 ## Unterschiede zu anderen URL-Addons
 
-Im Gegensatz zum klassischen URL Addon (url) arbeitet dieses Addon strikt mit YForm-Tabellen und benötigt für jede Tabelle ein explizites Slug-Feld. Das bedeutet:
+Im Gegensatz zum klassischen URL Addon (url) arbeitet dieses Addon nur mit YForm-Tabellen und benötigt für jede Tabelle ein explizites Slug-Feld in der Tabelle. 
 
 - **Slug-Feld erforderlich:** Für jede angebundene YForm-Tabelle muss ein eindeutiges Slug-Feld existieren, das die sprechende URL für den jeweiligen Datensatz enthält.
 - **Keine Profile pro Pfad nötig:** Anders als beim URL Addon, wo für jeden Pfad (z.B. jede Kategorie oder jedes Modul) ein eigenes Profil angelegt werden muss, genügt bei Virtual URLs ein Profil pro Tabelle. Das Routing ist dadurch deutlich einfacher und flexibler.
 - **Strikte YForm-Bindung:** Aktuell funktioniert das Addon ausschließlich mit YForm-Tabellen. Eigene, nicht-YForm-Tabellen werden (noch) nicht unterstützt.
 
-Das klassische URL Addon ist universeller einsetzbar und kann mit beliebigen Tabellen und Strukturen arbeiten, benötigt aber für komplexe Strukturen oft viele Profile und individuelle Konfigurationen. Virtual URLs ist auf YForm spezialisiert und setzt auf ein zentrales, einfaches Profil-Konzept pro Tabelle.
+Das klassische URL Addon ist universeller einsetzbar und kann mit beliebigen Tabellen und Strukturen arbeiten, benötigt aber ggf. Virtual URLs ist auf YForm spezialisiert und setzt auf ein zentrales, einfaches Profil-Konzept pro Tabelle.
+URL-AddOn bietet viel mehr Optionen. 
 
-Eine parallele Nutzung beider Addons ist technisch möglich, sollte aber mit Bedacht erfolgen, um Routing-Konflikte zu vermeiden.
+Eine parallele Nutzung beider Addons ist technisch möglich, sollte aber mit Bedacht erfolgen, um Routing-Konflikte zu vermeiden (nicht die glechen keys verweden)
 
 ## Konzept
 
