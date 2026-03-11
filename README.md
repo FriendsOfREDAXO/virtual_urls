@@ -1,6 +1,6 @@
 # Virtual URLs AddOn für REDAXO cms
 
-Dieses AddOn ermöglicht es, YForm-Datensätze (z.B. News, Produkte, Mitarbeiter) als virtuelle Unterseiten in die bestehende Struktur-Hierarchie einzuhängen — ohne für jede Ansicht einen eigenes Profil anlegen zu müssen.
+Dieses AddOn ermöglicht es, YForm-Datensätze (z.B. News, Produkte, Mitarbeiter) als virtuelle Unterseiten in die bestehende Struktur-Hierarchie einzuhängen — ohne für jede Ansicht innerhalt der Struktur einen eigenes Profil anlegen zu müssen.
 
 ## Features
 
