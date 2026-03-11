@@ -25,8 +25,8 @@ Im Gegensatz zum klassischen URL Addon (url) arbeitet dieses Addon nur mit YForm
 - **Keine Profile pro Pfad nötig:** Virtual Urls braucht nur den trigger um zu erkennen dass es sich um z.B. news handelt.
 - **Strikte YForm-Bindung:** Aktuell funktioniert das Addon ausschließlich mit YForm-Tabellen. Eigene, nicht-YForm-Tabellen werden (noch) nicht unterstützt.
 
-Das klassische URL Addon ist universeller einsetzbar und kann mit beliebigen Tabellen und Strukturen arbeiten, benötigt aber ggf. Virtual URLs ist auf YForm spezialisiert und setzt auf ein zentrales, einfaches Profil-Konzept pro Tabelle.
-URL-AddOn bietet viel mehr Optionen. 
+Das klassische URL Addon ist universeller einsetzbar und kann mit beliebigen Tabellen und Strukturen arbeiten. Virtual URLs ist auf YForm ausgelegt  und setzt auf ein zentrales, einfacheres Profil-Konzept pro Tabelle. Es bietet dagegen weniger Einfluss auf die URL. 
+URL-AddOn bietet viel mehr Optionen vor allem im Bereich der Relationen. 
 
 Eine parallele Nutzung beider Addons ist technisch möglich, sollte aber mit Bedacht erfolgen, um Routing-Konflikte zu vermeiden (nicht die glechen keys verweden)
 
