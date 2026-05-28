@@ -6,7 +6,11 @@ $selectedTable = rex_request('slug_table', 'string', '');
 $sourceField = rex_request('slug_source', 'string', '');
 $targetField = rex_request('slug_target', 'string', '');
 $mode = rex_request('slug_mode', 'string', 'empty_only');
-$generate = rex_request('slug_generate', 'string', '');
+$generate = rex_request('slug_generate', 'int', 0);
+$csrfToken = rex_csrf_token::factory('virtual_urls_tools_generate');
+$csrfParams = $csrfToken->getUrlParams();
+$csrfName = (string) array_key_first($csrfParams);
+$csrfValue = $csrfName !== '' ? (string) ($csrfParams[$csrfName] ?? '') : '';
 
 // Verfügbare YForm-Tabellen laden
 $tables = [];
@@ -39,20 +43,30 @@ if ($selectedTable !== '' && isset($tables[$selectedTable])) {
 }
 
 // --- Slug-Generierung ausführen ---
-if ($generate === '1' && $selectedTable !== '' && $sourceField !== '' && $targetField !== '') {
+if (
+    $generate === 1
+    && rex_request_method() === 'post'
+    && $csrfToken->isValid()
+    && $selectedTable !== ''
+    && $sourceField !== ''
+    && $targetField !== ''
+    && isset($tables[$selectedTable])
+    && isset($fields[$sourceField], $fields[$targetField])
+) {
     $sql = rex_sql::factory();
+    $tableIdentifier = $sql->escapeIdentifier($selectedTable);
 
     // Alle Datensätze laden
     if ($mode === 'empty_only') {
         $items = $sql->getArray(
             'SELECT id, ' . $sql->escapeIdentifier($sourceField) . ', ' . $sql->escapeIdentifier($targetField) .
-            ' FROM ' . $selectedTable .
+            ' FROM ' . $tableIdentifier .
             ' WHERE ' . $sql->escapeIdentifier($targetField) . ' = "" OR ' . $sql->escapeIdentifier($targetField) . ' IS NULL'
         );
     } else {
         $items = $sql->getArray(
             'SELECT id, ' . $sql->escapeIdentifier($sourceField) . ', ' . $sql->escapeIdentifier($targetField) .
-            ' FROM ' . $selectedTable
+            ' FROM ' . $tableIdentifier
         );
     }
 
@@ -63,7 +77,7 @@ if ($generate === '1' && $selectedTable !== '' && $sourceField !== '' && $target
         $existingSlugs = [];
         if ($mode === 'empty_only') {
             $existing = $sql->getArray(
-                'SELECT ' . $sql->escapeIdentifier($targetField) . ' FROM ' . $selectedTable .
+                'SELECT ' . $sql->escapeIdentifier($targetField) . ' FROM ' . $tableIdentifier .
                 ' WHERE ' . $sql->escapeIdentifier($targetField) . ' != "" AND ' . $sql->escapeIdentifier($targetField) . ' IS NOT NULL'
             );
             foreach ($existing as $row) {
@@ -115,13 +129,20 @@ if ($generate === '1' && $selectedTable !== '' && $sourceField !== '' && $target
         // YForm-Cache leeren
         rex_yform_manager_table::deleteCache();
     }
+} elseif ($generate === 1 && rex_request_method() === 'post' && !$csrfToken->isValid()) {
+    echo rex_view::error('CSRF-Fehler beim Generieren der Slugs.');
+} elseif ($generate === 1 && rex_request_method() === 'post') {
+    echo rex_view::error('Bitte Tabelle und gültige Quell-/Zielfelder wählen.');
 }
 
 // --- Formular ---
 $formContent = '';
 
-$formContent .= '<form method="get" action="' . rex_url::currentBackendPage() . '">';
+$formContent .= '<form method="post" action="' . rex_url::currentBackendPage() . '">';
 $formContent .= '<input type="hidden" name="page" value="' . rex_escape(rex_request('page', 'string')) . '">';
+if ($csrfName !== '') {
+    $formContent .= '<input type="hidden" name="' . rex_escape($csrfName) . '" value="' . rex_escape($csrfValue) . '">';
+}
 
 // Schritt 1: Tabelle wählen
 $formContent .= '<fieldset><legend>1. Tabelle wählen</legend>';
@@ -146,7 +167,7 @@ if ($selectedTable !== '' && count($fields) > 0) {
     $formContent .= '<label for="slug_source">Quellfeld (z.B. title, name)</label>';
     $formContent .= '<select name="slug_source" id="slug_source" class="form-control">';
     $formContent .= '<option value="">– Quellfeld wählen –</option>';
-    foreach ($fields as $fName => $fLabel) {
+    foreach ($textFields as $fName => $fLabel) {
         $selected = $sourceField === $fName ? ' selected' : '';
         $formContent .= '<option value="' . rex_escape($fName) . '"' . $selected . '>' . rex_escape($fLabel) . '</option>';
     }
@@ -179,9 +200,10 @@ if ($selectedTable !== '' && count($fields) > 0) {
     // Vorschau: erste 10 Datensätze
     if ($sourceField !== '' && $targetField !== '') {
         $previewSql = rex_sql::factory();
+        $previewTable = $previewSql->escapeIdentifier($selectedTable);
         $previewItems = $previewSql->getArray(
             'SELECT id, ' . $previewSql->escapeIdentifier($sourceField) . ', ' . $previewSql->escapeIdentifier($targetField) .
-            ' FROM ' . $selectedTable . ' LIMIT 10'
+            ' FROM ' . $previewTable . ' LIMIT 10'
         );
 
         if (count($previewItems) > 0) {
@@ -225,8 +247,7 @@ if ($selectedTable !== '' && count($fields) > 0) {
     }
 
     // Generate-Button
-    $formContent .= '<input type="hidden" name="slug_generate" value="1">';
-    $formContent .= '<button type="submit" class="btn btn-primary" onclick="return confirm(\'Slugs jetzt generieren?\')"><i class="rex-icon fa-cogs"></i> Slugs generieren</button>';
+    $formContent .= '<button type="submit" name="slug_generate" value="1" class="btn btn-primary" onclick="return confirm(\'Slugs jetzt generieren?\')"><i class="rex-icon fa-cogs"></i> Slugs generieren</button>';
 }
 
 $formContent .= '</form>';

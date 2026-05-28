@@ -8,11 +8,18 @@ use rex_extension_point;
 use rex_sql;
 use rex_string;
 use rex_yform_manager_dataset;
+use rex_yform_manager_table;
 use rex_yrewrite;
 use rex_yrewrite_domain;
 
 class VirtualUrls
 {
+    /** @var array<string, list<array<string, mixed>>> */
+    private static array $profilesCache = [];
+
+    /** @var array<string, array<string, int>> */
+    private static array $relationSlugCache = [];
+
     /**
      * Handle virtual URL resolution via YREWRITE_PREPARE EP.
      *
@@ -24,19 +31,22 @@ class VirtualUrls
         $url = $ep->getParam('url');
         $domain = $ep->getParam('domain');
 
+        if (!is_object($domain) || !method_exists($domain, 'getName')) {
+            return null;
+        }
+
         $url = trim($url, '/');
         $segments = explode('/', $url);
 
         // Get profiles matching the current domain and language
         $clangId = rex_clang::getCurrentId();
-        $sql = rex_sql::factory();
-        $profiles = $sql->getArray(
-            'SELECT * FROM ' . rex::getTable('virtual_urls_profiles') . 
-            ' WHERE status = 1 AND (domain = :domain OR domain = :empty) AND (clang_id = :clang OR clang_id = -1)',
-            ['domain' => $domain->getName(), 'empty' => '', 'clang' => $clangId]
-        );
+        $profiles = self::getProfilesForDomainAndClang($domain->getName(), $clangId);
 
         foreach ($profiles as $profile) {
+            if (!self::isValidProfile($profile)) {
+                continue;
+            }
+
             $trigger = $profile['trigger_segment'];
             $hasRelation = trim($profile['relation_field'] ?? '') !== '' 
                 && trim($profile['relation_table'] ?? '') !== '' 
@@ -77,10 +87,13 @@ class VirtualUrls
                 $table = $profile['table_name'];
                 $field = $profile['url_field'];
 
-                $dataset = rex_yform_manager_dataset::query($table)
-                    ->where($field, $slug)
-                    ->where($profile['relation_field'], $relationId)
-                    ->findOne();
+                $dataset = self::findDatasetByRequestedSlug(
+                    $table,
+                    $field,
+                    $slug,
+                    (string) $profile['relation_field'],
+                    $relationId
+                );
             } else {
                 // URL: /<path>/<trigger>/<item-slug> (ohne Relation)
                 if (!isset($segments[$triggerIndex + 1])) {
@@ -96,9 +109,7 @@ class VirtualUrls
                 $table = $profile['table_name'];
                 $field = $profile['url_field'];
 
-                $dataset = rex_yform_manager_dataset::query($table)
-                    ->where($field, $slug)
-                    ->findOne();
+                $dataset = self::findDatasetByRequestedSlug($table, $field, $slug);
             }
 
             if ($dataset) {
@@ -142,19 +153,23 @@ class VirtualUrls
      */
     private static function resolveRelationSlug(string $table, string $slugField, string $slug): ?int
     {
-        $sql = rex_sql::factory();
-        $rows = $sql->getArray(
-            'SELECT id, ' . $sql->escapeIdentifier($slugField) . ' FROM ' . $table
-        );
+        $cacheKey = $table . '|' . $slugField;
+        if (!isset(self::$relationSlugCache[$cacheKey])) {
+            self::$relationSlugCache[$cacheKey] = [];
+            $sql = rex_sql::factory();
+            $rows = $sql->getArray(
+                'SELECT id, ' . $sql->escapeIdentifier($slugField) . ' FROM ' . $sql->escapeIdentifier($table)
+            );
 
-        foreach ($rows as $row) {
-            $normalized = rex_string::normalize((string) $row[$slugField], '-', '_');
-            if ($normalized === $slug) {
-                return (int) $row['id'];
+            foreach ($rows as $row) {
+                $normalized = self::buildNormalizedSlug((string) $row[$slugField], (int) $row['id']);
+                if ($normalized !== '') {
+                    self::$relationSlugCache[$cacheKey][$normalized] = (int) $row['id'];
+                }
             }
         }
 
-        return null;
+        return self::$relationSlugCache[$cacheKey][$slug] ?? null;
     }
 
     /**
@@ -191,5 +206,139 @@ class VirtualUrls
     public static function getCurrentProfile()
     {
         return rex::getProperty('virtual_urls.profile');
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function getProfilesForDomainAndClang(string $domainName, int $clangId): array
+    {
+        $cacheKey = $domainName . '|' . $clangId;
+        if (!isset(self::$profilesCache[$cacheKey])) {
+            $sql = rex_sql::factory();
+            self::$profilesCache[$cacheKey] = $sql->getArray(
+                'SELECT * FROM ' . rex::getTable('virtual_urls_profiles')
+                . ' WHERE status = 1 AND (domain = :domain OR domain = :empty) AND (clang_id = :clang OR clang_id = -1)',
+                ['domain' => $domainName, 'empty' => '', 'clang' => $clangId]
+            );
+        }
+
+        return self::$profilesCache[$cacheKey];
+    }
+
+    /**
+     * @param array<string, mixed> $profile
+     */
+    private static function isValidProfile(array $profile): bool
+    {
+        $table = (string) ($profile['table_name'] ?? '');
+        $urlField = (string) ($profile['url_field'] ?? '');
+
+        if ($table === '' || $urlField === '') {
+            return false;
+        }
+
+        $tableObject = rex_yform_manager_table::get($table);
+        if ($tableObject === null) {
+            return false;
+        }
+
+        $fieldNames = [];
+        foreach ($tableObject->getFields() as $field) {
+            $fieldNames[$field->getName()] = true;
+        }
+
+        if (!isset($fieldNames[$urlField])) {
+            return false;
+        }
+
+        $relationField = (string) ($profile['relation_field'] ?? '');
+        $relationTable = (string) ($profile['relation_table'] ?? '');
+        $relationSlugField = (string) ($profile['relation_slug_field'] ?? '');
+
+        $hasRelation = $relationField !== '' || $relationTable !== '' || $relationSlugField !== '';
+        if (!$hasRelation) {
+            return true;
+        }
+
+        if ($relationField === '' || $relationTable === '' || $relationSlugField === '') {
+            return false;
+        }
+
+        if (!isset($fieldNames[$relationField])) {
+            return false;
+        }
+
+        $relationTableObject = rex_yform_manager_table::get($relationTable);
+        if ($relationTableObject === null) {
+            return false;
+        }
+
+        foreach ($relationTableObject->getFields() as $field) {
+            if ($field->getName() === $relationSlugField) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function findDatasetByRequestedSlug(
+        string $table,
+        string $field,
+        string $requestedSlug,
+        ?string $relationField = null,
+        ?int $relationId = null
+    ): ?rex_yform_manager_dataset {
+        $query = rex_yform_manager_dataset::query($table)->where($field, $requestedSlug);
+        if ($relationField !== null && $relationField !== '' && $relationId !== null) {
+            $query->where($relationField, $relationId);
+        }
+
+        $dataset = $query->findOne();
+        if ($dataset !== null) {
+            return $dataset;
+        }
+
+        if (preg_match('/^(.*)-([0-9]+)$/', $requestedSlug, $matches) !== 1) {
+            return null;
+        }
+
+        $datasetId = (int) $matches[2];
+        if ($datasetId <= 0) {
+            return null;
+        }
+
+        $dataset = rex_yform_manager_dataset::get($datasetId, $table);
+        if ($dataset === null) {
+            return null;
+        }
+
+        if ($relationField !== null && $relationField !== '' && $relationId !== null) {
+            if ((int) $dataset->getValue($relationField) !== $relationId) {
+                return null;
+            }
+        }
+
+        $expectedSlug = self::buildNormalizedSlug((string) $dataset->getValue($field), $dataset->getId());
+        if ($expectedSlug === '' || $expectedSlug !== $requestedSlug) {
+            return null;
+        }
+
+        return $dataset;
+    }
+
+    private static function buildNormalizedSlug(string $value, int $id): string
+    {
+        $normalized = rex_string::normalize($value, '-', '_');
+        if ($normalized === '') {
+            return '';
+        }
+
+        if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $value) !== 1) {
+            return $normalized . '-' . $id;
+        }
+
+        return $normalized;
     }
 }

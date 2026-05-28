@@ -10,6 +10,7 @@ use rex_media;
 use rex_media_manager;
 use rex_sql;
 use rex_string;
+use rex_yform_manager_table;
 use rex_yrewrite;
 use rex_yrewrite_domain;
 
@@ -41,14 +42,23 @@ class VirtualUrlsSitemap
         );
 
         // Deduplicate: if a profile is clang-specific, skip the "all languages" variant for the same table+trigger
-        $specificClangs = [];
+        $hasSpecificProfile = [];
         foreach ($profiles as $p) {
             if ((int) ($p['clang_id'] ?? -1) >= 0) {
-                $specificClangs[$p['table_name'] . '|' . $p['trigger_segment']][] = (int) $p['clang_id'];
+                $hasSpecificProfile[$p['table_name'] . '|' . $p['trigger_segment']] = true;
             }
         }
 
         foreach ($profiles as $profile) {
+            if (!self::isProfileValidForSitemap($profile)) {
+                continue;
+            }
+
+            $profileKey = $profile['table_name'] . '|' . $profile['trigger_segment'];
+            if ((int) ($profile['clang_id'] ?? -1) === -1 && isset($hasSpecificProfile[$profileKey])) {
+                continue;
+            }
+
             // Check if the profile's category belongs to this domain
             $categoryId = (int) $profile['default_category_id'];
             $articleDomain = rex_yrewrite::getDomainByArticleId($categoryId);
@@ -67,7 +77,10 @@ class VirtualUrlsSitemap
             $where = '1=1';
 
             if (trim($profile['sitemap_filter'] ?? '') !== '') {
-                $where = self::replaceDatePlaceholders($profile['sitemap_filter']);
+                $resolvedFilter = self::replaceDatePlaceholders((string) $profile['sitemap_filter']);
+                if (self::isSafeSitemapFilter($resolvedFilter)) {
+                    $where = $resolvedFilter;
+                }
             }
 
             // Pre-load relation slugs if needed
@@ -75,21 +88,27 @@ class VirtualUrlsSitemap
             if ($hasRelation) {
                 $relSql = rex_sql::factory();
                 $relRows = $relSql->getArray(
-                    'SELECT id, ' . $relSql->escapeIdentifier($profile['relation_slug_field']) . ' FROM ' . $profile['relation_table']
+                    'SELECT id, ' . $relSql->escapeIdentifier($profile['relation_slug_field']) . ' FROM ' . $relSql->escapeIdentifier($profile['relation_table'])
                 );
                 foreach ($relRows as $relRow) {
-                    $relationSlugs[(int) $relRow['id']] = rex_string::normalize((string) $relRow[$profile['relation_slug_field']], '-', '_');
+                    $slugValue = self::buildNormalizedSlug((string) $relRow[$profile['relation_slug_field']], (int) $relRow['id']);
+                    if ($slugValue !== '') {
+                        $relationSlugs[(int) $relRow['id']] = $slugValue;
+                    }
                 }
             }
 
             $items = rex_sql::factory();
-            $items->setQuery('SELECT * FROM ' . $profile['table_name'] . ' WHERE ' . $where);
+            $items->setQuery('SELECT * FROM ' . $items->escapeIdentifier($profile['table_name']) . ' WHERE ' . $where);
 
             foreach ($items as $item) {
                 // Build full URL: category-path/trigger/[relation-slug/]slug
                 $clangForUrl = $profileClang >= 0 ? $profileClang : rex_clang::getStartId();
                 $catUrl = rtrim(rex_yrewrite::getFullUrlByArticleId($categoryId, $clangForUrl), '/');
-                $slug = $item->getValue($profile['url_field']);
+                $slug = self::buildNormalizedSlug((string) $item->getValue($profile['url_field']), (int) $item->getValue('id'));
+                if ($slug === '') {
+                    continue;
+                }
 
                 if ($hasRelation) {
                     $relationId = (int) $item->getValue($profile['relation_field']);
@@ -187,5 +206,86 @@ class VirtualUrlsSitemap
         $filter = str_replace('###DATE###', date('Y-m-d'), $filter);
 
         return $filter;
+    }
+
+    /**
+     * @param array<string, mixed> $profile
+     */
+    private static function isProfileValidForSitemap(array $profile): bool
+    {
+        $table = (string) ($profile['table_name'] ?? '');
+        $urlField = (string) ($profile['url_field'] ?? '');
+        if ($table === '' || $urlField === '') {
+            return false;
+        }
+
+        $tableObject = rex_yform_manager_table::get($table);
+        if ($tableObject === null) {
+            return false;
+        }
+
+        $mainFields = [];
+        foreach ($tableObject->getFields() as $field) {
+            $mainFields[$field->getName()] = true;
+        }
+
+        if (!isset($mainFields[$urlField])) {
+            return false;
+        }
+
+        $relationField = trim((string) ($profile['relation_field'] ?? ''));
+        $relationTable = trim((string) ($profile['relation_table'] ?? ''));
+        $relationSlugField = trim((string) ($profile['relation_slug_field'] ?? ''));
+        if ($relationField === '' && $relationTable === '' && $relationSlugField === '') {
+            return true;
+        }
+
+        if ($relationField === '' || $relationTable === '' || $relationSlugField === '') {
+            return false;
+        }
+
+        if (!isset($mainFields[$relationField])) {
+            return false;
+        }
+
+        $relationObject = rex_yform_manager_table::get($relationTable);
+        if ($relationObject === null) {
+            return false;
+        }
+
+        foreach ($relationObject->getFields() as $field) {
+            if ($field->getName() === $relationSlugField) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function isSafeSitemapFilter(string $filter): bool
+    {
+        if (preg_match('/(;|--|\/\*|\*\/)/', $filter) === 1) {
+            return false;
+        }
+
+        if (preg_match('/\b(UNION|INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE)\b/i', $filter) === 1) {
+            return false;
+        }
+
+        return preg_match('/^[a-zA-Z0-9_\s\(\)\'"\.=<>!%:+\-\/,&|]+$/', $filter) === 1;
+    }
+
+    private static function buildNormalizedSlug(string $value, int $id): string
+    {
+        $normalized = rex_string::normalize($value, '-', '_');
+        if ($normalized === '') {
+            return '';
+        }
+
+        if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $value) !== 1) {
+            return $normalized . '-' . $id;
+        }
+
+        return $normalized;
     }
 }

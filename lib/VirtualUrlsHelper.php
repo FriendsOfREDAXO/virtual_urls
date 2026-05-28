@@ -137,21 +137,22 @@ class VirtualUrlsHelper
         }
 
         $query = rex_yform_manager_dataset::query($table);
-        if ($where !== '') {
+        if ($where !== '' && self::isSafeWhereClause($where)) {
             $query->whereRaw($where);
         }
         if ($orderBy !== '') {
-            $query->orderRaw($orderBy);
+            self::applyOrderBy($query, $orderBy);
         }
 
         $result = [];
         foreach ($query->find() as $dataset) {
             $url = self::buildUrl($profile, $dataset, $clangId);
+            $slug = self::buildSlugSegment($dataset, (string) $profile['url_field']);
             if ($url !== null) {
                 $result[] = [
                     'id' => $dataset->getId(),
                     'url' => $url,
-                    'slug' => (string) $dataset->getValue($profile['url_field']),
+                    'slug' => $slug ?? '',
                     'dataset' => $dataset,
                 ];
             }
@@ -217,10 +218,13 @@ class VirtualUrlsHelper
                     ];
                 }
 
-                $dataset = rex_yform_manager_dataset::query($profile['table_name'])
-                    ->where($profile['url_field'], $slug)
-                    ->where($profile['relation_field'], $relationId)
-                    ->findOne();
+                $dataset = self::findDatasetByRequestedSlug(
+                    (string) $profile['table_name'],
+                    (string) $profile['url_field'],
+                    $slug,
+                    (string) $profile['relation_field'],
+                    $relationId
+                );
 
                 if ($dataset === null) {
                     return [
@@ -252,9 +256,11 @@ class VirtualUrlsHelper
             }
 
             $slug = $segments[$triggerIndex + 1];
-            $dataset = rex_yform_manager_dataset::query($profile['table_name'])
-                ->where($profile['url_field'], $slug)
-                ->findOne();
+            $dataset = self::findDatasetByRequestedSlug(
+                (string) $profile['table_name'],
+                (string) $profile['url_field'],
+                $slug
+            );
 
             if ($dataset === null) {
                 return [
@@ -351,7 +357,7 @@ class VirtualUrlsHelper
         $articleUrl = rex_getUrl($articleId, $clangId);
         $baseUrl = rtrim($articleUrl, '/');
 
-        $slug = (string) $dataset->getValue($profile['url_field']);
+        $slug = self::buildSlugSegment($dataset, (string) $profile['url_field']);
         if ($slug === '') {
             return null;
         }
@@ -395,7 +401,7 @@ class VirtualUrlsHelper
     {
         $sql = rex_sql::factory();
         $rows = $sql->getArray(
-            'SELECT ' . $sql->escapeIdentifier($slugField) . ' FROM ' . $table . ' WHERE id = :id',
+            'SELECT ' . $sql->escapeIdentifier($slugField) . ' FROM ' . $sql->escapeIdentifier($table) . ' WHERE id = :id',
             ['id' => $id]
         );
 
@@ -403,7 +409,9 @@ class VirtualUrlsHelper
             return null;
         }
 
-        return rex_string::normalize((string) $rows[0][$slugField], '-', '_');
+        $value = (string) $rows[0][$slugField];
+        $id = $id;
+        return self::buildNormalizedSlug($value, $id);
     }
 
     /**
@@ -413,16 +421,108 @@ class VirtualUrlsHelper
     {
         $sql = rex_sql::factory();
         $rows = $sql->getArray(
-            'SELECT id, ' . $sql->escapeIdentifier($slugField) . ' FROM ' . $table
+            'SELECT id, ' . $sql->escapeIdentifier($slugField) . ' FROM ' . $sql->escapeIdentifier($table)
         );
 
         foreach ($rows as $row) {
-            $normalized = rex_string::normalize((string) $row[$slugField], '-', '_');
+            $normalized = self::buildNormalizedSlug((string) $row[$slugField], (int) $row['id']);
             if ($normalized === $slug) {
                 return (int) $row['id'];
             }
         }
 
         return null;
+    }
+
+    public static function buildSlugSegment(rex_yform_manager_dataset $dataset, string $field): ?string
+    {
+        $value = (string) $dataset->getValue($field);
+        return self::buildNormalizedSlug($value, $dataset->getId());
+    }
+
+    private static function buildNormalizedSlug(string $value, int $id): ?string
+    {
+        $normalized = rex_string::normalize($value, '-', '_');
+        if ($normalized === '') {
+            return null;
+        }
+
+        // If source value is not slug-like, append ID to keep URLs collision-safe.
+        if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $value) !== 1) {
+            return $normalized . '-' . $id;
+        }
+
+        return $normalized;
+    }
+
+    private static function findDatasetByRequestedSlug(
+        string $table,
+        string $field,
+        string $requestedSlug,
+        ?string $relationField = null,
+        ?int $relationId = null
+    ): ?rex_yform_manager_dataset {
+        $query = rex_yform_manager_dataset::query($table)->where($field, $requestedSlug);
+        if ($relationField !== null && $relationField !== '' && $relationId !== null) {
+            $query->where($relationField, $relationId);
+        }
+
+        $dataset = $query->findOne();
+        if ($dataset !== null) {
+            return $dataset;
+        }
+
+        if (preg_match('/^(.*)-([0-9]+)$/', $requestedSlug, $matches) !== 1) {
+            return null;
+        }
+
+        $baseSlug = (string) $matches[1];
+        $datasetId = (int) $matches[2];
+        if ($datasetId <= 0) {
+            return null;
+        }
+
+        $dataset = rex_yform_manager_dataset::get($datasetId, $table);
+        if ($dataset === null) {
+            return null;
+        }
+
+        if ($relationField !== null && $relationField !== '' && $relationId !== null) {
+            if ((int) $dataset->getValue($relationField) !== $relationId) {
+                return null;
+            }
+        }
+
+        $expectedSlug = self::buildSlugSegment($dataset, $field);
+        if ($expectedSlug === null) {
+            return null;
+        }
+
+        if ($expectedSlug !== $requestedSlug && $expectedSlug !== $baseSlug . '-' . $datasetId) {
+            return null;
+        }
+
+        return $dataset;
+    }
+
+    private static function applyOrderBy($query, string $orderBy): void
+    {
+        if (preg_match('/^([a-zA-Z0-9_]+)(?:\s+(ASC|DESC))?$/i', trim($orderBy), $matches) === 1) {
+            $direction = strtoupper($matches[2] ?? 'ASC');
+            $query->orderBy($matches[1], $direction === 'DESC' ? 'DESC' : 'ASC');
+        }
+    }
+
+    private static function isSafeWhereClause(string $where): bool
+    {
+        if (preg_match('/(;|--|\/\*|\*\/)/', $where) === 1) {
+            return false;
+        }
+
+        if (preg_match('/\b(UNION|INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE)\b/i', $where) === 1) {
+            return false;
+        }
+
+        return preg_match('/^[a-zA-Z0-9_\s\(\)\'"\.=<>!%:+\-\/,&|]+$/', $where) === 1;
     }
 }
