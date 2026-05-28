@@ -410,7 +410,6 @@ class VirtualUrlsHelper
         }
 
         $value = (string) $rows[0][$slugField];
-        $id = $id;
         return self::buildNormalizedSlug($value, $id);
     }
 

@@ -40,7 +40,7 @@ $getRelationFieldMap = static function (string $tableName): array {
 if ($func === 'delete') {
     if (rex_request_method() !== 'post' || !$csrfToken->isValid()) {
         echo rex_view::error('CSRF-Fehler beim Löschen des Profils.');
-        rex_response::sendRedirect(rex_url::currentBackendPage());
+        return;
     }
 
     $sql = rex_sql::factory();
@@ -53,7 +53,7 @@ if ($func === 'delete') {
 if ($func === 'status') {
     if (rex_request_method() !== 'post' || !$csrfToken->isValid()) {
         echo rex_view::error('CSRF-Fehler beim Ändern des Status.');
-        rex_response::sendRedirect(rex_url::currentBackendPage());
+        return;
     }
 
     $status = rex_request('status', 'int', 0);
@@ -187,7 +187,7 @@ if ($func === 'edit' || $func === 'add') {
     $field->setAttribute('id', 'virtual-urls-relation-field');
     $field->setAttribute('class', 'form-control virtual-urls-relation-field-select');
     $field->setAttribute('data-selected', $form->isEditMode() ? $form->getSql()->getValue('relation_field') : '');
-    $field->setAttribute('data-relation-map', rex_escape((string) json_encode($relationFieldMap)));
+    $field->setAttribute('data-relation-map', (string) json_encode($relationFieldMap));
     $select = $field->getSelect();
     $select->addOption('Keine Relation', '');
     foreach ($preloadedRelationFields as $relationField) {

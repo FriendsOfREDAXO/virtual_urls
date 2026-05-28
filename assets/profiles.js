@@ -24,6 +24,15 @@
         var csrfValue = tableSelect.getAttribute('data-csrf-value');
         var firstTableLoad = true;
 
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function fetchTableMeta(tableName) {
             if (!tableName) {
                 return Promise.resolve({ columns: [], relation_fields: {} });
@@ -49,7 +58,7 @@
                 var value = item.value;
                 var label = item.label || item.value;
                 var isSelected = value === selectedValue ? ' selected' : '';
-                html += '<option value="' + value + '"' + isSelected + '>' + label + '</option>';
+                html += '<option value="' + escapeHtml(value) + '"' + isSelected + '>' + escapeHtml(label) + '</option>';
             });
 
             select.innerHTML = html;
