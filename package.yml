@@ -1,5 +1,5 @@
 package: virtual_urls
-version: '1.0.0'
+version: '1.1.0'
 author: FriendsOfREDAXO
 supportpage: https://github.com/FriendsOfREDAXO/virtual_urls
 
@@ -11,7 +11,7 @@ requires:
 
 page:
     title: 'Virtual URLs'
-    perm: admin
+    perm: admin[]
     icon: rex-icon fa-road
     subpages:
         profiles:

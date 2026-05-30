@@ -1,6 +1,6 @@
 # Virtual URLs AddOn für REDAXO cms
 
-Dieses AddOn ermöglicht es, YForm-Datensätze (z.B. News, Produkte, Mitarbeiter) als virtuelle Unterseiten in die bestehende Struktur-Hierarchie einzuhängen — ohne für jede Ansicht innerhalt der Struktur einen eigenes Profil anlegen zu müssen.
+Dieses AddOn ermöglicht es, YForm-Datensätze (z.B. News, Produkte, Mitarbeiter) als virtuelle Unterseiten in die bestehende Struktur-Hierarchie einzuhängen — ohne für jede Ansicht innerhalt der Struktur einen eigenes Profil anlegen zu müssen. Es arbeitet mit Triggern. 
 
 ## Features
 
@@ -10,25 +10,21 @@ Dieses AddOn ermöglicht es, YForm-Datensätze (z.B. News, Produkte, Mitarbeiter
 - ⚡ **Auto-Caching:** Bei Änderungen an Datensätzen wird der Cache sofort aktualisiert
 - 🐌 **Slug-Generator:** YForm-Feldtyp + Bulk-Generator für bestehende Datensätze
 - 🔗 **Relation-URLs:** Optionale Kategorie-Segmente in der URL (`/news/sport/mein-artikel`)
+- 🧠 **Intelligente Relation-Konfiguration:** Relationstabelle wird aus dem gewählten Relationsfeld automatisch abgeleitet
 - 🌐 **Mehrsprachigkeit:** Pro Sprache eigene Profile mit unterschiedlichen Triggern und Slug-Feldern
 - 🏢 **Multi-Domain:** Profile können auf einzelne Domains beschränkt werden
 - 🔍 **SEO-Integration:** Automatische Generierung von Canonical-URLs, Meta-Titles, Descriptions und Images
 - 🧪 **URL-Tester:** Backend-Tool zum Testen und Debuggen von URLs
 - 📖 **Helper-Klasse:** API zum Erzeugen von URLs und Links in Modulen/Templates
+- 🔒 **Sicherere Backend-Aktionen:** Mutierende Aktionen mit POST + CSRF
 
 
-## Unterschiede zu anderen URL-Addons
+## Einordnung
 
-Im Gegensatz zum klassischen URL Addon (url) arbeitet dieses Addon nur mit YForm-Tabellen und benötigt für jede Tabelle ein explizites Slug-Feld in der Tabelle. 
+Dieses AddOn ist keine Ersatzlösung für das URL-AddOn.
+Es ist bewusst auf YForm-basierte Routing-Profile zugeschnitten und deckt damit einen klar abgegrenzten Einsatzbereich ab.
+Das URL-AddOn ist weitaus universeller anzusehen.
 
-- **Slug-Feld erforderlich:** Für jede angebundene YForm-Tabelle muss ein eindeutiges Slug-Feld existieren, das die sprechende URL für den jeweiligen Datensatz enthält.
-- **Keine Profile pro Pfad nötig:** Virtual Urls braucht nur den trigger um zu erkennen dass es sich um z.B. news handelt.
-- **Strikte YForm-Bindung:** Aktuell funktioniert das Addon ausschließlich mit YForm-Tabellen. Eigene, nicht-YForm-Tabellen werden (noch) nicht unterstützt.
-
-Das klassische URL Addon ist universeller einsetzbar und kann mit beliebigen Tabellen und Strukturen arbeiten. Virtual URLs ist auf YForm ausgelegt  und setzt auf ein zentrales, einfacheres Profil-Konzept pro Tabelle. Es bietet dagegen weniger Einfluss auf die URL. 
-URL-AddOn bietet viel mehr Optionen vor allem im Bereich der Relationen. 
-
-Eine parallele Nutzung beider Addons ist technisch möglich, sollte aber mit Bedacht erfolgen, um Routing-Konflikte zu vermeiden (nicht die glechen keys verweden)
 
 ## Konzept
 
@@ -61,8 +57,8 @@ Unter **Virtual URLs → Profile** ein neues Profil erstellen:
 | **Slug Feld Name** | Ja | Feld mit dem normalisierten URL-Slug, z.B. `url` oder `code` |
 | **Renderer Artikel** | Ja | REDAXO-Artikel, der den Datensatz rendert |
 | **Standard Kategorie** | Nein | Basis-Kategorie für Sitemap-URLs |
-| **Relation Feld** | Nein | Feld in der Datentabelle (z.B. `category_id`) |
-| **Relation Tabelle** | Nein | Tabelle der Relation (z.B. `rex_news_category`) |
+| **Relation Feld** | Nein | Relationsfeld aus der Datentabelle (z.B. `category_id`) |
+| **Relation Tabelle** | Nein | Wird automatisch aus dem gewählten Relationsfeld gesetzt |
 | **Relation Slug Feld** | Nein | Feld für den URL-Teil (z.B. `name`), wird automatisch normalisiert |
 | **Sitemap Filter** | Nein | SQL WHERE-Klausel mit optionalen Platzhaltern |
 | **Sitemap Changefreq** | Nein | Wie oft ändert sich der Inhalt voraussichtlich? |
@@ -109,11 +105,23 @@ Das Routing filtert automatisch nach der aktuellen Sprache. Der Helper nutzt imm
 
 Für hierarchische URLs (z.B. `/news/sport/mein-artikel`):
 
-1. In der Datentabelle braucht es ein Relation-Feld (z.B. `category_id`)
-2. Die Relationstabelle (z.B. `rex_news_category`) muss ein Feld haben, das als URL-Segment dient (z.B. `name`)
-3. Im Profil alle drei Relation-Felder ausfüllen
+1. In der Datentabelle braucht es ein echtes Relationsfeld (z.B. `be_manager_relation`)
+2. Die Relationstabelle wird automatisch aus diesem Feld ermittelt
+3. Im Profil muss nur das Relation-Feld und ein passendes Relation-Slug-Feld gewählt werden
 
 Die Relation wird automatisch normalisiert: „Sport & Fitness" → `sport-fitness`.
+
+### 5. URL-Feld: echtes Slug-Feld vs. beliebiges Feld
+
+- Wenn das gewählte URL-Feld bereits slug-artige Werte enthält, werden diese direkt genutzt.
+- Wenn das URL-Feld keine slug-artigen Werte enthält, wird intern normalisiert und zur Kollisionsvermeidung ein `-<id>` Suffix verwendet.
+
+Beispiel:
+
+- Quellwert: `Mein Artikel`
+- URL-Segment: `mein-artikel-42`
+
+Dadurch bleiben URLs eindeutig, auch bei gleichen Titeln.
 
 ## Verwendung im Modul
 
@@ -225,7 +233,8 @@ online_date >= "###NOW -1 YEAR###"
 
 ## Caching
 
-Das AddOn überwacht `YFORM_DATA_ADDED`, `YFORM_DATA_UPDATED` und `YFORM_DATA_DELETED`. Bei Änderungen an konfigurierten Tabellen wird der YRewrite-Cache automatisch invalidiert.
+Das AddOn überwacht `YFORM_DATA_ADDED`, `YFORM_DATA_UPDATED` und `YFORM_DATA_DELETED`.
+Bei Änderungen an konfigurierten Quell- oder Relationstabellen wird der YRewrite-Cache automatisch invalidiert.
 
 ## System-Integration
 

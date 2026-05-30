@@ -27,7 +27,11 @@ class VirtualUrlsCache
     public static function checkCacheClear(rex_extension_point $ep)
     {
         $params = $ep->getParams();
-        $table = $params['table'];
+        $table = $params['table'] ?? null;
+        if (!is_object($table) || !method_exists($table, 'getTableName')) {
+            return;
+        }
+        $tableName = (string) $table->getTableName();
         
         // Only proceed if YRewrite is available
         if (!rex_addon::get('yrewrite')->isAvailable()) {
@@ -39,12 +43,16 @@ class VirtualUrlsCache
         // Since this happens on write operations (save), a small DB query is fine.
         
         $sql = rex_sql::factory();
-        // Check if the modified table is used in any profile
-        $sql->setQuery('SELECT id FROM ' . rex::getTable('virtual_urls_profiles') . ' WHERE table_name = :table LIMIT 1', ['table' => $table->getTableName()]);
+        // Check if the modified table is used in any profile (source or relation table)
+        $sql->setQuery(
+            'SELECT id FROM ' . rex::getTable('virtual_urls_profiles') . ' WHERE table_name = :table OR relation_table = :table LIMIT 1',
+            ['table' => $tableName]
+        );
         
         if ($sql->getRows() > 0) {
             // Table is used in Virtual URLs -> Clear YRewrite Cache
             rex_yrewrite::deleteCache();
+            VirtualUrlsHelper::clearCache();
         }
     }
 }
