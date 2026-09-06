@@ -7,8 +7,11 @@ use rex_clang;
 use rex_escape;
 use rex_sql;
 use rex_string;
+use rex_addon;
+use rex_extension_point;
 use rex_yform_manager_dataset;
 use rex_yform_manager_table;
+use rex_yrewrite;
 
 /**
  * Helper-Klasse zum Erzeugen von virtuellen URLs und Links.
@@ -20,7 +23,7 @@ use rex_yform_manager_table;
  */
 class VirtualUrlsHelper
 {
-    /** @var array<string, array<string, mixed>>|null */
+    /** @var list<array<string, mixed>>|null aktive Profile, siehe getAllProfiles() */
     private static ?array $profileCache = null;
 
     /**
@@ -294,41 +297,195 @@ class VirtualUrlsHelper
     }
 
     /**
-     * Gibt alle registrierten Profile zurück.
+     * Gibt alle aktiven Profile zurück.
      *
      * @return list<array<string, mixed>>
      */
     public static function getAllProfiles(): array
     {
-        $sql = rex_sql::factory();
-        return $sql->getArray('SELECT * FROM ' . rex::getTable('virtual_urls_profiles') . ' WHERE status = 1');
+        if (self::$profileCache === null) {
+            $sql = rex_sql::factory();
+            self::$profileCache = $sql->getArray('SELECT * FROM ' . rex::getTable('virtual_urls_profiles') . ' WHERE status = 1 ORDER BY id');
+        }
+        return self::$profileCache;
     }
 
     /**
-     * Gibt das Profil für eine bestimmte Tabelle und Sprache zurück.
-     *
-     * Präferiert ein sprachspezifisches Profil, fällt auf "Alle Sprachen" zurück.
+     * Gibt ein aktives Profil anhand seiner ID zurück.
      *
      * @return array<string, mixed>|null
      */
-    public static function getProfileByTable(string $table, int $clangId = -1): ?array
+    public static function getProfileById(int $id): ?array
+    {
+        foreach (self::getAllProfiles() as $profile) {
+            if ((int) $profile['id'] === $id) {
+                return $profile;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Gibt alle aktiven Profile einer Tabelle zurück (alle Sprachen und Domains).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function getProfilesByTable(string $table): array
+    {
+        $result = [];
+        foreach (self::getAllProfiles() as $profile) {
+            if ((string) $profile['table_name'] === $table) {
+                $result[] = $profile;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Gibt das Profil für eine Tabelle, Sprache und Domain zurück.
+     *
+     * Reihenfolge: Domain + Sprache, Domain + alle Sprachen, alle Domains +
+     * Sprache, alle Domains + alle Sprachen. Ohne Angabe gilt die aktuelle
+     * yrewrite-Domain; bei mehreren Profilen pro Tabelle (Multi-Domain)
+     * gewinnt damit das passende statt eines zufälligen.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function getProfileByTable(string $table, int $clangId = -1, ?string $domain = null): ?array
     {
         if ($clangId < 0) {
             $clangId = rex_clang::getCurrentId();
         }
+        if ($domain === null) {
+            $domain = self::getCurrentDomainName();
+        }
 
-        if (self::$profileCache === null) {
-            self::$profileCache = [];
-            foreach (self::getAllProfiles() as $profile) {
-                $key = $profile['table_name'] . '|' . (int) ($profile['clang_id'] ?? -1);
-                self::$profileCache[$key] = $profile;
+        $candidates = self::getProfilesByTable($table);
+        foreach ([[$domain, $clangId], [$domain, -1], ['', $clangId], ['', -1]] as [$wantDomain, $wantClang]) {
+            foreach ($candidates as $profile) {
+                if ((string) ($profile['domain'] ?? '') !== $wantDomain) {
+                    continue;
+                }
+                if ((int) ($profile['clang_id'] ?? -1) !== $wantClang) {
+                    continue;
+                }
+                return $profile;
             }
         }
 
-        // Erst sprachspezifisches Profil, dann Fallback auf "Alle"
-        return self::$profileCache[$table . '|' . $clangId]
-            ?? self::$profileCache[$table . '|-1']
-            ?? null;
+        return null;
+    }
+
+    /**
+     * Erzeugt die URL eines Datensatzes über ein konkretes Profil.
+     *
+     * @param array<string, mixed> $profile Profil-Zeile (siehe getProfilesByTable())
+     */
+    public static function getUrlByProfile(array $profile, int $datasetId, int $clangId = -1): ?string
+    {
+        if ($clangId < 0) {
+            $clangId = rex_clang::getCurrentId();
+        }
+        $profileClang = (int) ($profile['clang_id'] ?? -1);
+        if ($profileClang > 0 && $profileClang !== $clangId) {
+            return null;
+        }
+        $dataset = rex_yform_manager_dataset::get($datasetId, (string) $profile['table_name']);
+        if ($dataset === null) {
+            return null;
+        }
+        return self::buildUrl($profile, $dataset, $clangId);
+    }
+
+    /**
+     * Alle URLs eines Datensatzes über sämtliche passenden Profile der Tabelle.
+     *
+     * @return list<array{profile: array<string, mixed>, url: string}>
+     */
+    public static function getUrls(string $table, int $datasetId, int $clangId = -1): array
+    {
+        $result = [];
+        foreach (self::getProfilesByTable($table) as $profile) {
+            $url = self::getUrlByProfile($profile, $datasetId, $clangId);
+            if ($url !== null) {
+                $result[] = ['profile' => $profile, 'url' => $url];
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * URL_REWRITE-Hook (siehe boot.php): erlaubt rex_getUrl('', '', ['news-id' => 42])
+     * analog zum url-Addon. Parameter-Schlüssel ist "<trigger_segment>-id" eines
+     * aktiven Profils; Domain und Sprache entscheiden bei mehreren Profilen mit
+     * gleichem Trigger. Weitere Parameter werden als Query angehängt.
+     */
+    public static function handleUrlRewrite(rex_extension_point $ep): ?string
+    {
+        if ((string) $ep->getSubject() !== '') {
+            return null;
+        }
+        $params = (array) $ep->getParam('params');
+        if ($params === []) {
+            return null;
+        }
+        $clangId = (int) $ep->getParam('clang');
+        $domain = self::getCurrentDomainName();
+
+        foreach ($params as $key => $value) {
+            if (!is_string($key) || !str_ends_with($key, '-id') || (int) $value < 1) {
+                continue;
+            }
+            $trigger = substr($key, 0, -3);
+            $matching = array_values(array_filter(self::getAllProfiles(), static fn (array $p): bool => (string) $p['trigger_segment'] === $trigger));
+            if ($matching === []) {
+                continue;
+            }
+            $profile = self::pickProfile($matching, $clangId, $domain);
+            if ($profile === null) {
+                continue;
+            }
+            $url = self::getUrlByProfile($profile, (int) $value, $clangId);
+            if ($url === null) {
+                continue;
+            }
+            unset($params[$key]);
+            if ($params !== []) {
+                $url .= '?' . rex_string::buildQuery($params, (string) $ep->getParam('separator'));
+            }
+            return $url;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $profiles
+     * @return array<string, mixed>|null
+     */
+    private static function pickProfile(array $profiles, int $clangId, string $domain): ?array
+    {
+        foreach ([[$domain, $clangId], [$domain, -1], ['', $clangId], ['', -1]] as [$wantDomain, $wantClang]) {
+            foreach ($profiles as $profile) {
+                if ((string) ($profile['domain'] ?? '') === $wantDomain && (int) ($profile['clang_id'] ?? -1) === $wantClang) {
+                    return $profile;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static function getCurrentDomainName(): string
+    {
+        if (!rex_addon::get('yrewrite')->isAvailable() || !class_exists(rex_yrewrite::class)) {
+            return '';
+        }
+        $domain = rex_yrewrite::getCurrentDomain();
+        if ($domain === null && rex::isBackend()) {
+            return '';
+        }
+        $name = $domain !== null ? (string) $domain->getName() : '';
+        return $name === 'default' ? '' : $name;
     }
 
     /**

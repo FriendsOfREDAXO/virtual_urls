@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+- `URL_REWRITE`-Hook: `rex_getUrl('', '', ['<trigger>-id' => $id])` erzeugt virtuelle URLs (Backend und Frontend), analog zum url-Addon.
+- Helper-Methoden `getProfilesByTable()`, `getProfileById()`, `getUrlByProfile()`, `getUrls()`; `getProfileByTable()` mit optionalem Domain-Parameter.
+
+### Changed
+- Profilwahl im Helper ist domainbewusst: bei mehreren Profilen pro Tabelle (Multi-Domain) gewinnt das Profil der aktuellen Domain, danach die Sprache, statt eines zufällig zuletzt geladenen.
+- Profil-Cache lädt einmal alle aktiven Profile.
+
 ## 1.1.0 - 2026-05-28
 
 ### Added
