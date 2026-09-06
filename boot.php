@@ -2,6 +2,7 @@
 
 use FriendsOfRedaxo\VirtualUrl\VirtualUrls;
 use FriendsOfRedaxo\VirtualUrl\VirtualUrlsCache;
+use FriendsOfRedaxo\VirtualUrl\VirtualUrlsHelper;
 use FriendsOfRedaxo\VirtualUrl\VirtualUrlsSeo;
 use FriendsOfRedaxo\VirtualUrl\VirtualUrlsSitemap;
 
@@ -17,6 +18,10 @@ if (rex_addon::get('yform')->isAvailable()) {
 
 // 3. Frontend / YRewrite integration
 if (rex_addon::get('yrewrite')->isAvailable()) {
+
+    // rex_getUrl('', '', ['<trigger>-id' => 42]) -> virtuelle URL (Backend und
+    // Frontend, gleiches Muster wie das url-Addon). Siehe VirtualUrlsHelper::handleUrlRewrite().
+    rex_extension::register('URL_REWRITE', [VirtualUrlsHelper::class, 'handleUrlRewrite'], rex_extension::EARLY);
     
     // Routing Logic via YREWRITE_PREPARE (fires when YRewrite can't resolve a URL)
     if (!rex::isBackend()) {

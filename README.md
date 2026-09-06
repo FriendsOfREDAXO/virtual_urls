@@ -172,6 +172,17 @@ foreach ($urls as $item) {
 }
 ```
 
+### URLs per `rex_getUrl()`
+
+Wie beim url-Addon lässt sich eine virtuelle URL auch über `rex_getUrl()` erzeugen. Parameter-Schlüssel ist `<trigger>-id`:
+
+```php
+echo rex_getUrl('', '', ['news-id' => 42]);             // /pfad/news/mein-artikel
+echo rex_getUrl('', '', ['news-id' => 42, 'page' => 2]); // weitere Parameter werden als Query angehängt
+```
+
+Bei mehreren Profilen mit gleichem Trigger (Multi-Domain, Mehrsprachigkeit) entscheiden aktuelle Domain und Sprache.
+
 ### URL programmatisch testen
 
 ```php
@@ -259,6 +270,11 @@ Bei Änderungen an konfigurierten Quell- oder Relationstabellen wird der YRewrit
 | `getUrlByDataset(rex_yform_manager_dataset $d, int $clang = -1): ?string` | URL aus Dataset |
 | `getLink(string $table, int $id, string $label, array $attrs, int $clang): string` | HTML-Link |
 | `getUrlList(string $table, string $where, string $order, int $clang): array` | Alle URLs einer Tabelle |
+| `getUrlByProfile(array $profile, int $id, int $clang = -1): ?string` | URL über ein konkretes Profil (bei mehreren Profilen pro Tabelle) |
+| `getUrls(string $table, int $id, int $clang = -1): array` | Alle URLs eines Datensatzes über sämtliche passenden Profile (`[['profile' => …, 'url' => …], …]`) |
+| `getProfilesByTable(string $table): array` | Alle aktiven Profile einer Tabelle |
+| `getProfileById(int $id): ?array` | Aktives Profil per ID |
+| `getProfileByTable(string $table, int $clang = -1, ?string $domain = null): ?array` | Profil nach Tabelle, Sprache und Domain (Default: aktuelle yrewrite-Domain) |
 | `testUrl(string $url, ?string $domain): array` | URL testen |
 | `getProfileByTable(string $table, int $clang = -1): ?array` | Profil für Tabelle+Sprache |
 | `getAllProfiles(): array` | Alle Profile |
