@@ -4,6 +4,7 @@ namespace FriendsOfRedaxo\VirtualUrl;
 
 use rex;
 use rex_clang;
+use rex_extension;
 use rex_extension_point;
 use rex_sql;
 use rex_string;
@@ -92,7 +93,8 @@ class VirtualUrls
                     $field,
                     $slug,
                     (string) $profile['relation_field'],
-                    $relationId
+                    $relationId,
+                    $profile
                 );
             } else {
                 // URL: /<path>/<trigger>/<item-slug> (ohne Relation)
@@ -109,7 +111,7 @@ class VirtualUrls
                 $table = $profile['table_name'];
                 $field = $profile['url_field'];
 
-                $dataset = self::findDatasetByRequestedSlug($table, $field, $slug);
+                $dataset = self::findDatasetByRequestedSlug($table, $field, $slug, null, null, $profile);
             }
 
             if ($dataset) {
@@ -138,6 +140,23 @@ class VirtualUrls
                 if ($clang >= 0) {
                     $result['clang'] = $clang;
                 }
+
+                /**
+                 * Fired after ein Request erfolgreich auf einen Datensatz aufgelöst wurde,
+                 * bevor das Ergebnis an YRewrite zurückgegeben wird. Zum reinen Reagieren
+                 * gedacht (Logging, Tracking, zusätzliches Caching) - das Subject kann
+                 * verändert zurückgegeben werden, wird aber von YRewrite selbst nicht
+                 * validiert.
+                 *
+                 * Subject: array{article_id: int, clang?: int}
+                 * Params: dataset, profile, domain
+                 */
+                $result = rex_extension::registerPoint(new rex_extension_point(
+                    'VIRTUAL_URLS_RESOLVED',
+                    $result,
+                    ['dataset' => $dataset, 'profile' => $profile, 'domain' => $domain],
+                ));
+
                 return $result;
             }
         }
@@ -283,17 +302,39 @@ class VirtualUrls
         return false;
     }
 
+    /**
+     * @param array<string, mixed> $profile
+     */
     private static function findDatasetByRequestedSlug(
         string $table,
         string $field,
         string $requestedSlug,
         ?string $relationField = null,
-        ?int $relationId = null
+        ?int $relationId = null,
+        array $profile = []
     ): ?rex_yform_manager_dataset {
         $query = rex_yform_manager_dataset::query($table)->where($field, $requestedSlug);
         if ($relationField !== null && $relationField !== '' && $relationId !== null) {
             $query->where($relationField, $relationId);
         }
+
+        /**
+         * Erlaubt Drittanbieter-Code, zusätzliche Einschränkungen auf die
+         * Lookup-Query anzuwenden (z.B. Online-Status, Embargo-Datum,
+         * Mandanten-Filter), bevor der Datensatz zur URL aufgelöst wird.
+         *
+         * Hinweis: Betrifft nur den regulären Slug-Lookup. Der Fallback über
+         * das numerische "-<id>"-Suffix weiter unten fragt den Datensatz
+         * direkt per ID ab und durchläuft diese Query nicht.
+         *
+         * Subject: rex_yform_manager_query
+         * Params: table, field, slug, profile
+         */
+        $query = rex_extension::registerPoint(new rex_extension_point(
+            'VIRTUAL_URLS_PROFILE_QUERY',
+            $query,
+            ['table' => $table, 'field' => $field, 'slug' => $requestedSlug, 'profile' => $profile],
+        ));
 
         $dataset = $query->findOne();
         if ($dataset !== null) {

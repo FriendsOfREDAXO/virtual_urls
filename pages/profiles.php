@@ -165,7 +165,8 @@ if ($func === 'edit' || $func === 'add') {
 
     $field = $form->addSelectField('url_field');
     $field->setLabel('Slug Feld Name');
-    $field->setNotice('z.B. code oder url');
+    $field->setNotice('z.B. code oder url. Auch ein beliebiges Inhaltsfeld (z.B. title) kann direkt gewählt werden - der Slug wird automatisch daraus normalisiert, ein eigenes Slug-Feld ist nicht zwingend nötig.');
+    $field->setAttribute('id', 'virtual-urls-url-field');
     $field->setAttribute('class', 'form-control virtual-urls-main-column-select');
     $field->setAttribute('data-selected', $form->isEditMode() ? $form->getSql()->getValue('url_field') : '');
     $select = $field->getSelect();
@@ -211,6 +212,7 @@ if ($func === 'edit' || $func === 'add') {
     $field = $form->addSelectField('relation_slug_field');
     $field->setLabel('Relation Slug Feld (Optional)');
     $field->setNotice('Feld in der Relationstabelle für den URL-Teil, z.B. name oder url_slug. Wird automatisch normalisiert.');
+    $field->setAttribute('id', 'virtual-urls-relation-slug-field');
     $field->setAttribute('class', 'form-control virtual-urls-relation-column-select');
     $field->setAttribute('data-selected', $form->isEditMode() ? $form->getSql()->getValue('relation_slug_field') : '');
     $select = $field->getSelect();
