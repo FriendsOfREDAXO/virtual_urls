@@ -274,7 +274,8 @@ class VirtualUrlsHelper
                     (string) $profile['url_field'],
                     $slug,
                     (string) $profile['relation_field'],
-                    $relationId
+                    $relationId,
+                    $profile
                 );
 
                 if ($dataset === null) {
@@ -284,7 +285,7 @@ class VirtualUrlsHelper
                         'dataset' => null,
                         'article_id' => (int) $profile['article_id'],
                         'relation_id' => $relationId,
-                        'message' => 'Datensatz mit ' . $profile['url_field'] . '="' . $slug . '" und ' . $profile['relation_field'] . '=' . $relationId . ' nicht gefunden in ' . $profile['table_name'] . '.',
+                        'message' => 'Datensatz mit ' . $profile['url_field'] . '="' . $slug . '" und ' . $profile['relation_field'] . '=' . $relationId . ' nicht gefunden in ' . $profile['table_name'] . '.' . self::statusFieldHint($profile),
                     ];
                 }
 
@@ -310,7 +311,10 @@ class VirtualUrlsHelper
             $dataset = self::findDatasetByRequestedSlug(
                 (string) $profile['table_name'],
                 (string) $profile['url_field'],
-                $slug
+                $slug,
+                null,
+                null,
+                $profile
             );
 
             if ($dataset === null) {
@@ -320,7 +324,7 @@ class VirtualUrlsHelper
                     'dataset' => null,
                     'article_id' => (int) $profile['article_id'],
                     'relation_id' => null,
-                    'message' => 'Datensatz mit ' . $profile['url_field'] . '="' . $slug . '" nicht gefunden in ' . $profile['table_name'] . '.',
+                    'message' => 'Datensatz mit ' . $profile['url_field'] . '="' . $slug . '" nicht gefunden in ' . $profile['table_name'] . '.' . self::statusFieldHint($profile),
                 ];
             }
 
@@ -672,16 +676,44 @@ class VirtualUrlsHelper
         return $normalized;
     }
 
+    /**
+     * Ergänzt "nicht gefunden"-Meldungen im URL-Tester um einen Hinweis, falls
+     * ein Status-Feld konfiguriert ist - das ist der häufigste Grund, warum ein
+     * eigentlich vorhandener Datensatz sich nicht auflösen lässt.
+     *
+     * @param array<string, mixed> $profile
+     */
+    private static function statusFieldHint(array $profile): string
+    {
+        $statusField = trim((string) ($profile['status_field'] ?? ''));
+        if ($statusField === '') {
+            return '';
+        }
+
+        $statusValue = (string) ($profile['status_value'] ?? '1');
+        return ' Hinweis: Dieses Profil filtert zusätzlich nach ' . $statusField . '="' . $statusValue . '" - möglicherweise liegt es daran.';
+    }
+
+    /**
+     * @param array<string, mixed> $profile
+     */
     private static function findDatasetByRequestedSlug(
         string $table,
         string $field,
         string $requestedSlug,
         ?string $relationField = null,
-        ?int $relationId = null
+        ?int $relationId = null,
+        array $profile = []
     ): ?rex_yform_manager_dataset {
         $query = rex_yform_manager_dataset::query($table)->where($field, $requestedSlug);
         if ($relationField !== null && $relationField !== '' && $relationId !== null) {
             $query->where($relationField, $relationId);
+        }
+
+        $statusField = trim((string) ($profile['status_field'] ?? ''));
+        $statusValue = (string) ($profile['status_value'] ?? '1');
+        if ($statusField !== '') {
+            $query->where($statusField, $statusValue);
         }
 
         $dataset = $query->findOne();
@@ -708,6 +740,10 @@ class VirtualUrlsHelper
             if ((int) $dataset->getValue($relationField) !== $relationId) {
                 return null;
             }
+        }
+
+        if ($statusField !== '' && (string) $dataset->getValue($statusField) !== $statusValue) {
+            return null;
         }
 
         $expectedSlug = self::buildSlugSegment($dataset, $field);

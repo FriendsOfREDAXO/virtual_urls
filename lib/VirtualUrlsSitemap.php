@@ -75,12 +75,20 @@ class VirtualUrlsSitemap
 
             // Build WHERE clause
             $where = '1=1';
+            $whereParams = [];
 
             if (trim($profile['sitemap_filter'] ?? '') !== '') {
                 $resolvedFilter = self::replaceDatePlaceholders((string) $profile['sitemap_filter']);
                 if (self::isSafeSitemapFilter($resolvedFilter)) {
                     $where = $resolvedFilter;
                 }
+            }
+
+            $statusField = trim((string) ($profile['status_field'] ?? ''));
+            if ($statusField !== '') {
+                $items = rex_sql::factory();
+                $where = $items->escapeIdentifier($statusField) . ' = :status_value AND (' . $where . ')';
+                $whereParams['status_value'] = (string) ($profile['status_value'] ?? '1');
             }
 
             // Pre-load relation slugs if needed
@@ -99,7 +107,7 @@ class VirtualUrlsSitemap
             }
 
             $items = rex_sql::factory();
-            $items->setQuery('SELECT * FROM ' . $items->escapeIdentifier($profile['table_name']) . ' WHERE ' . $where);
+            $items->setQuery('SELECT * FROM ' . $items->escapeIdentifier($profile['table_name']) . ' WHERE ' . $where, $whereParams);
 
             foreach ($items as $item) {
                 // Build full URL: category-path/trigger/[relation-slug/]slug
@@ -230,6 +238,11 @@ class VirtualUrlsSitemap
         }
 
         if (!isset($mainFields[$urlField])) {
+            return false;
+        }
+
+        $statusField = trim((string) ($profile['status_field'] ?? ''));
+        if ($statusField !== '' && !isset($mainFields[$statusField])) {
             return false;
         }
 

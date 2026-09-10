@@ -271,6 +271,11 @@ class VirtualUrls
             return false;
         }
 
+        $statusField = (string) ($profile['status_field'] ?? '');
+        if ($statusField !== '' && !isset($fieldNames[$statusField])) {
+            return false;
+        }
+
         $relationField = (string) ($profile['relation_field'] ?? '');
         $relationTable = (string) ($profile['relation_table'] ?? '');
         $relationSlugField = (string) ($profile['relation_slug_field'] ?? '');
@@ -318,6 +323,12 @@ class VirtualUrls
             $query->where($relationField, $relationId);
         }
 
+        $statusField = trim((string) ($profile['status_field'] ?? ''));
+        if ($statusField !== '') {
+            $statusValue = (string) ($profile['status_value'] ?? '1');
+            $query->where($statusField, $statusValue);
+        }
+
         /**
          * Erlaubt Drittanbieter-Code, zusätzliche Einschränkungen auf die
          * Lookup-Query anzuwenden (z.B. Online-Status, Embargo-Datum,
@@ -325,7 +336,9 @@ class VirtualUrls
          *
          * Hinweis: Betrifft nur den regulären Slug-Lookup. Der Fallback über
          * das numerische "-<id>"-Suffix weiter unten fragt den Datensatz
-         * direkt per ID ab und durchläuft diese Query nicht.
+         * direkt per ID ab und durchläuft diese Query (und damit auch diesen
+         * EP) nicht - das Status-Feld wird dort separat geprüft, individuelle
+         * Einschränkungen über diesen EP jedoch nicht.
          *
          * Subject: rex_yform_manager_query
          * Params: table, field, slug, profile
@@ -359,6 +372,10 @@ class VirtualUrls
             if ((int) $dataset->getValue($relationField) !== $relationId) {
                 return null;
             }
+        }
+
+        if ($statusField !== '' && (string) $dataset->getValue($statusField) !== $statusValue) {
+            return null;
         }
 
         $expectedSlug = self::buildNormalizedSlug(VirtualUrlsHelper::resolveFieldValue($dataset, $field), $dataset->getId());
