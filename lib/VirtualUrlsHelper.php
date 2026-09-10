@@ -619,7 +619,7 @@ class VirtualUrlsHelper
     /**
      * Gibt den normalisierten Slug für eine Relation-ID zurück.
      */
-    private static function getRelationSlugById(string $table, string $slugField, int $id): ?string
+    public static function getRelationSlugById(string $table, string $slugField, int $id): ?string
     {
         $sql = rex_sql::factory();
         $rows = $sql->getArray(
@@ -659,6 +659,17 @@ class VirtualUrlsHelper
     {
         $value = self::resolveFieldValue($dataset, $field);
         return self::buildNormalizedSlug($value, $dataset->getId());
+    }
+
+    /**
+     * Normalisiert einen bereits gelesenen Feldwert zu einem Slug-Segment, ohne
+     * einen Datensatz zur Verfügung haben zu müssen (z.B. für Werte aus
+     * old_data eines YFORM_DATA_UPDATED-Events). Gibt einen leeren String
+     * zurück statt null, wenn keine Normalisierung möglich ist.
+     */
+    public static function normalizeSlug(string $value, int $id): string
+    {
+        return self::buildNormalizedSlug($value, $id) ?? '';
     }
 
     private static function buildNormalizedSlug(string $value, int $id): ?string
