@@ -17,6 +17,10 @@ Dieses AddOn ermöglicht es, YForm-Datensätze (z.B. News, Produkte, Mitarbeiter
 - 🧪 **URL-Tester:** Backend-Tool zum Testen und Debuggen von URLs
 - 📖 **Helper-Klasse:** API zum Erzeugen von URLs und Links in Modulen/Templates
 - 🔒 **Sicherere Backend-Aktionen:** Mutierende Aktionen mit POST + CSRF
+- 🚦 **Status Feld:** Optionaler Online/Offline-Filter, der Routing und Sitemap gleichermaßen betrifft
+- ↪️ **301-Redirects:** Geänderte Slugs leiten automatisch von der alten auf die aktuelle URL weiter, statt einen 404 zu erzeugen
+- 🧩 **Eigene Extension Points:** `VIRTUAL_URLS_PROFILE_QUERY`, `VIRTUAL_URLS_BUILD_URL`, `VIRTUAL_URLS_RESOLVED` für Erweiterungen ohne Fork
+- 🌍 **`yform_lang_fields`-Integration:** Mehrsprachige Felder (`lang_text`/`lang_textarea`/`lang_media`) funktionieren direkt als URL-, SEO- oder Relation-Slug-Feld
 
 
 ## Einordnung
@@ -402,6 +406,19 @@ rex_extension::register('VIRTUAL_URLS_RESOLVED', function (rex_extension_point $
 | `testUrl(string $url, ?string $domain): array` | URL testen |
 | `getAllProfiles(): array` | Alle aktiven Profile (gecacht) |
 | `clearCache(): void` | Profil-Cache leeren |
+| `resolveFieldValue(rex_yform_manager_dataset $d, string $field, int $clang = -1): string` | Feldwert als String, löst `yform_lang_fields`-JSON für die angegebene Sprache auf |
+| `resolveRawValue($raw, int $clang = -1): string` | Wie `resolveFieldValue()`, aber für einen bereits gelesenen Rohwert (z.B. aus `rex_sql::getValue()`) |
+| `getRelationSlugById(string $table, string $slugField, int $id): ?string` | Normalisierter Slug einer Relation-Zeile |
+| `buildSlugSegment(rex_yform_manager_dataset $d, string $field): ?string` | Normalisiertes Slug-Segment für ein Dataset-Feld |
+| `normalizeSlug(string $value, int $id): string` | Normalisiert einen bereits gelesenen Wert zu einem Slug-Segment (ohne Dataset) |
+
+### `VirtualUrlsRedirects` (301-Redirects)
+
+| Methode | Beschreibung |
+|---|---|
+| `init(): void` | Registriert den `YFORM_DATA_UPDATED`-Listener (wird in boot.php aufgerufen) |
+| `recordOldSlug(rex_extension_point $ep): void` | Schreibt den alten Slug in die Historie, falls er sich geändert hat |
+| `redirectIfOldSlug(array $profiles, array $segments, int $clangId): void` | Prüft die Historie und sendet bei Treffer einen `301` (wird von `VirtualUrls::handle()` aufgerufen) |
 
 ## Autor
 
