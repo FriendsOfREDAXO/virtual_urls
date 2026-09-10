@@ -60,7 +60,9 @@ Unter **Virtual URLs → Profile** ein neues Profil erstellen:
 | **Relation Feld** | Nein | Relationsfeld aus der Datentabelle (z.B. `category_id`) |
 | **Relation Tabelle** | Nein | Wird automatisch aus dem gewählten Relationsfeld gesetzt |
 | **Relation Slug Feld** | Nein | Feld für den URL-Teil (z.B. `name`), wird automatisch normalisiert |
-| **Sitemap Filter** | Nein | SQL WHERE-Klausel mit optionalen Platzhaltern |
+| **Status Feld** | Nein | Feld für Online/Offline-Status (z.B. `status`). Greift bei Routing UND Sitemap gleichermaßen |
+| **Status Wert** | Nein | Wert, der als "online" gilt (Standard: `1`) |
+| **Sitemap Filter** | Nein | SQL WHERE-Klausel mit optionalen Platzhaltern. Zusätzlich zum Status-Feld, falls beide gesetzt sind |
 | **Sitemap Changefreq** | Nein | Wie oft ändert sich der Inhalt voraussichtlich? |
 | **Sitemap Priority** | Nein | Priorität der URLs im Vergleich zu anderen URLs (0.0 bis 1.0) |
 | **SEO Title Feld** | Nein | Spalte für den Meta-Title (z.B. `title`). Leer = Standard |
@@ -128,6 +130,17 @@ Beispiel:
 - URL-Segment: `mein-artikel-42`
 
 Dadurch bleiben URLs eindeutig, auch bei gleichen Titeln.
+
+### 6. Status-Feld (Online/Offline)
+
+Der **Sitemap Filter** (SQL WHERE-Klausel) betrifft ausschließlich die `sitemap.xml` — ein per Sitemap-Filter ausgeschlossener Datensatz bleibt über seine URL trotzdem erreichbar und lässt sich weiterhin auflösen. Für den häufigsten Fall (ein einzelnes Online/Offline-Flag, das sowohl das Routing als auch die Sitemap betreffen soll) gibt es das **Status Feld**:
+
+- **Status Feld:** Spalte in der Datentabelle, z.B. `status`
+- **Status Wert:** Wert, der als "online" gilt (Standard: `1`)
+
+Ist ein Status-Feld gesetzt, lässt sich die URL eines Datensatzes, dessen Wert nicht mit dem Status-Wert übereinstimmt, nicht mehr auflösen (404 statt Rendering), und der Datensatz wird auch nicht mehr in die Sitemap aufgenommen. `Sitemap Filter` und `Status Feld` lassen sich kombinieren — beide Bedingungen müssen dann erfüllt sein.
+
+Für Filterlogik, die über ein einzelnes Feld/Wert-Paar hinausgeht (z.B. ein Embargo-Datum), lässt sich stattdessen der Extension Point `VIRTUAL_URLS_PROFILE_QUERY` nutzen (siehe unten).
 
 **Mit `yform_lang_fields`:** Ist ein `lang_text`/`lang_textarea`/`lang_media`-Feld als URL-Feld (oder Relation-Slug-Feld) gewählt, wird automatisch der Wert der aktuellen Sprache aus dem gespeicherten JSON aufgelöst und daraus der Slug gebildet — auch hier ist kein separates Slug-Feld pro Sprache nötig. Im Profil-Formular werden solche Felder in der Auswahlliste mit 🌐 markiert.
 

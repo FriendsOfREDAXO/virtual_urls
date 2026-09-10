@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0 - 2026-09-10
+
+### Added
+- Neues optionales Profil-Feld **Status Feld** (+ **Status Wert**, Standard `1`): filtert sowohl beim Routing (Datensatz mit abweichendem Statuswert ist über seine URL nicht mehr auflösbar) als auch in der Sitemap. Bisher betraf der `Sitemap Filter` ausschließlich die Sitemap, das Routing selbst kannte keinen eingebauten Online/Offline-Filter.
+- URL-Tester weist in der "nicht gefunden"-Meldung darauf hin, wenn ein Status-Feld konfiguriert ist, da das der häufigste Grund für eine unerwartet nicht auflösbare URL ist.
+
 ## 1.4.0 - 2026-09-10
 
 ### Added
