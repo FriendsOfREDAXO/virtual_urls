@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.1 - 2026-09-10
+
+### Docs
+- README aktualisiert: Status Feld, 301-Redirects, eigene Extension Points und die `yform_lang_fields`-Integration standen bisher nur in eigenen Abschnitten, fehlten aber in der Features-Übersicht und der API-Referenz.
+
 ## 1.6.0 - 2026-09-10
 
 ### Added
