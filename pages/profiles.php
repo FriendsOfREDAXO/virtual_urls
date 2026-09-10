@@ -221,9 +221,26 @@ if ($func === 'edit' || $func === 'add') {
         $select->addOption($col, $col);
     }
 
+    $field = $form->addSelectField('status_field');
+    $field->setLabel('Status Feld (Optional)');
+    $field->setNotice('Feld für Online/Offline-Status (z.B. status). Wird sowohl beim Routing (URL nicht auflösbar, wenn Wert nicht passt) als auch in der Sitemap angewendet.');
+    $field->setAttribute('id', 'virtual-urls-status-field');
+    $field->setAttribute('class', 'form-control virtual-urls-main-column-select');
+    $field->setAttribute('data-selected', $form->isEditMode() ? $form->getSql()->getValue('status_field') : '');
+    $select = $field->getSelect();
+    $select->addOption('Kein Status-Feld', '');
+    foreach ($preloadedMainColumns as $col) {
+        $select->addOption($col, $col);
+    }
+
+    $field = $form->addTextField('status_value');
+    $field->setLabel('Status Wert');
+    $field->setNotice('Wert, der als "online" gilt, z.B. 1. Nur relevant, wenn ein Status-Feld gewählt ist.');
+    $field->setDefaultSaveValue('1');
+
     $field = $form->addTextField('sitemap_filter');
     $field->setLabel('Sitemap Filter (SQL Where)');
-    $field->setNotice('z.B. status = 1 AND date <= "###NOW -1 DAY###"');
+    $field->setNotice('z.B. status = 1 AND date <= "###NOW -1 DAY###". Zusätzlich zum Status-Feld, falls beide gesetzt sind.');
 
     $field = $form->addSelectField('sitemap_changefreq');
     $field->setLabel('Sitemap Changefreq');
@@ -306,6 +323,8 @@ if ($func === 'edit' || $func === 'add') {
     $list->removeColumn('seo_title_field');
     $list->removeColumn('seo_description_field');
     $list->removeColumn('seo_image_field');
+    $list->removeColumn('status_field');
+    $list->removeColumn('status_value');
 
     $list->setColumnFormat('status', 'custom', static function ($params) use ($csrfName, $csrfValue) {
         $status = (int) $params['list']->getValue('status');

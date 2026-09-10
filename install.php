@@ -20,5 +20,7 @@ rex_sql_table::get(rex::getTable('virtual_urls_profiles'))
     ->ensureColumn(new rex_sql_column('seo_title_field', 'varchar(255)', true))
     ->ensureColumn(new rex_sql_column('seo_description_field', 'varchar(255)', true))
     ->ensureColumn(new rex_sql_column('seo_image_field', 'varchar(255)', true))
+    ->ensureColumn(new rex_sql_column('status_field', 'varchar(255)', true))
+    ->ensureColumn(new rex_sql_column('status_value', 'varchar(255)', false, '1'))
     ->setPrimaryKey('id')
     ->ensure();
