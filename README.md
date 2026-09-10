@@ -101,6 +101,10 @@ Für mehrsprachige Seiten pro Sprache ein eigenes Profil anlegen:
 
 Das Routing filtert automatisch nach der aktuellen Sprache. Der Helper nutzt immer das sprachspezifische Profil und fällt auf „Alle Sprachen" zurück.
 
+**Alternative: ein Feld für alle Sprachen (`yform_lang_fields`)**
+
+Ist das AddOn [`yform_lang_fields`](https://github.com/KLXM/yform_lang_fields) installiert, kann statt separater Spalten pro Sprache (`slug_de`, `slug_en`, …) auch ein einzelnes `lang_text`/`lang_textarea`/`lang_media`-Feld als URL-Slug-, SEO-Title-/-Description-/-Image- oder Relation-Slug-Feld ausgewählt werden. Virtual URLs löst den JSON-Wert dieser Felder automatisch für die jeweils aktuelle Sprache auf (Routing, URL-Erzeugung, SEO-Tags und Sitemap). Ohne `yform_lang_fields` bleibt das Verhalten für normale Felder unverändert.
+
 ### 4. Relation-URLs
 
 Für hierarchische URLs (z.B. `/news/sport/mein-artikel`):
@@ -290,6 +294,7 @@ Bei Änderungen an konfigurierten Quell- oder Relationstabellen wird der YRewrit
 - Extension Point `YREWRITE_PREPARE` für URL-Auflösung
 - Extension Point `YREWRITE_DOMAIN_SITEMAP` für Sitemap-Einträge
 - Benötigt: YRewrite ≥ 2.0, YForm ≥ 4.0, REDAXO ≥ 5.10
+- Optional: [`yform_lang_fields`](https://github.com/KLXM/yform_lang_fields) – wenn installiert, werden `lang_text`/`lang_textarea`/`lang_media`-Felder überall dort, wo Virtual URLs einen Feldwert als String benötigt (URL-Slug, Relation-Slug, SEO-Title/-Description/-Image), automatisch für die aktuelle Sprache aufgelöst
 
 ## API-Referenz
 

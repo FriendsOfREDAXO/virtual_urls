@@ -162,7 +162,7 @@ class VirtualUrls
             );
 
             foreach ($rows as $row) {
-                $normalized = self::buildNormalizedSlug((string) $row[$slugField], (int) $row['id']);
+                $normalized = self::buildNormalizedSlug(VirtualUrlsHelper::resolveRawValue($row[$slugField]), (int) $row['id']);
                 if ($normalized !== '') {
                     self::$relationSlugCache[$cacheKey][$normalized] = (int) $row['id'];
                 }
@@ -320,7 +320,7 @@ class VirtualUrls
             }
         }
 
-        $expectedSlug = self::buildNormalizedSlug((string) $dataset->getValue($field), $dataset->getId());
+        $expectedSlug = self::buildNormalizedSlug(VirtualUrlsHelper::resolveFieldValue($dataset, $field), $dataset->getId());
         if ($expectedSlug === '' || $expectedSlug !== $requestedSlug) {
             return null;
         }

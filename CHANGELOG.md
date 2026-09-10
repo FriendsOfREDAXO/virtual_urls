@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0 - 2026-09-10
+
+### Fixed
+- Kompatibilität mit dem AddOn `yform_lang_fields`: Ist ein für URL-Slug, SEO-Title/-Description/-Image oder Relations-Slug konfiguriertes Feld ein `lang_text`/`lang_textarea`/`lang_media`-Feld, wurde bisher das rohe JSON (`[{"clang_id":1,"value":"..."}]`) statt des Textwerts der aktuellen Sprache verwendet – sichtbar u.a. als kaputte Slugs, JSON in Meta-Tags und in der Sitemap. Betroffene Stellen lösen den Wert jetzt über `yform_lang_fields` auf, sofern das AddOn installiert ist; ohne `yform_lang_fields` (oder bei normalen, nicht-mehrsprachigen Feldern) ändert sich das Verhalten nicht.
+
 ## 1.2.0
 
 ### Added

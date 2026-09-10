@@ -91,7 +91,7 @@ class VirtualUrlsSitemap
                     'SELECT id, ' . $relSql->escapeIdentifier($profile['relation_slug_field']) . ' FROM ' . $relSql->escapeIdentifier($profile['relation_table'])
                 );
                 foreach ($relRows as $relRow) {
-                    $slugValue = self::buildNormalizedSlug((string) $relRow[$profile['relation_slug_field']], (int) $relRow['id']);
+                    $slugValue = self::buildNormalizedSlug(VirtualUrlsHelper::resolveRawValue($relRow[$profile['relation_slug_field']]), (int) $relRow['id']);
                     if ($slugValue !== '') {
                         $relationSlugs[(int) $relRow['id']] = $slugValue;
                     }
@@ -105,7 +105,7 @@ class VirtualUrlsSitemap
                 // Build full URL: category-path/trigger/[relation-slug/]slug
                 $clangForUrl = $profileClang >= 0 ? $profileClang : rex_clang::getStartId();
                 $catUrl = rtrim(rex_yrewrite::getFullUrlByArticleId($categoryId, $clangForUrl), '/');
-                $slug = self::buildNormalizedSlug((string) $item->getValue($profile['url_field']), (int) $item->getValue('id'));
+                $slug = self::buildNormalizedSlug(VirtualUrlsHelper::resolveRawValue($item->getValue($profile['url_field']), $clangForUrl), (int) $item->getValue('id'));
                 if ($slug === '') {
                     continue;
                 }
@@ -143,7 +143,7 @@ class VirtualUrlsSitemap
                 // SEO Image
                 $imageField = $profile['seo_image_field'] ?? '';
                 if ($imageField && $item->hasValue($imageField)) {
-                    $image = $item->getValue($imageField);
+                    $image = VirtualUrlsHelper::resolveRawValue($item->getValue($imageField), $clangForUrl);
                     if ($image) {
                         $images = explode(',', $image);
                         $image = array_shift($images);
