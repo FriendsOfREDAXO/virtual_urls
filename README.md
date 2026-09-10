@@ -117,6 +117,8 @@ Die Relation wird automatisch normalisiert: „Sport & Fitness" → `sport-fitne
 
 ### 5. URL-Feld: echtes Slug-Feld vs. beliebiges Feld
 
+Ein eigenes Slug-Feld (per `virtual_url_slug`-Feldtyp oder Slug-Generator) ist **optional**, kein Pflichtbestandteil. Als "Slug Feld Name" im Profil kann direkt jede beliebige Spalte der Tabelle gewählt werden, z.B. `title`:
+
 - Wenn das gewählte URL-Feld bereits slug-artige Werte enthält, werden diese direkt genutzt.
 - Wenn das URL-Feld keine slug-artigen Werte enthält, wird intern normalisiert und zur Kollisionsvermeidung ein `-<id>` Suffix verwendet.
 
@@ -126,6 +128,8 @@ Beispiel:
 - URL-Segment: `mein-artikel-42`
 
 Dadurch bleiben URLs eindeutig, auch bei gleichen Titeln.
+
+**Mit `yform_lang_fields`:** Ist ein `lang_text`/`lang_textarea`/`lang_media`-Feld als URL-Feld (oder Relation-Slug-Feld) gewählt, wird automatisch der Wert der aktuellen Sprache aus dem gespeicherten JSON aufgelöst und daraus der Slug gebildet — auch hier ist kein separates Slug-Feld pro Sprache nötig. Im Profil-Formular werden solche Felder in der Auswahlliste mit 🌐 markiert.
 
 ## Verwendung im Modul
 
@@ -295,6 +299,59 @@ Bei Änderungen an konfigurierten Quell- oder Relationstabellen wird der YRewrit
 - Extension Point `YREWRITE_DOMAIN_SITEMAP` für Sitemap-Einträge
 - Benötigt: YRewrite ≥ 2.0, YForm ≥ 4.0, REDAXO ≥ 5.10
 - Optional: [`yform_lang_fields`](https://github.com/KLXM/yform_lang_fields) – wenn installiert, werden `lang_text`/`lang_textarea`/`lang_media`-Felder überall dort, wo Virtual URLs einen Feldwert als String benötigt (URL-Slug, Relation-Slug, SEO-Title/-Description/-Image), automatisch für die aktuelle Sprache aufgelöst
+
+## Eigene Extension Points
+
+Virtual URLs registriert drei eigene Extension Points, über die eigener Code ohne Fork in URL-Auflösung und -Erzeugung eingreifen kann:
+
+### `VIRTUAL_URLS_PROFILE_QUERY`
+
+Läuft direkt vor dem Datenbank-Lookup, wenn ein Request auf einen Datensatz aufgelöst wird. Erlaubt zusätzliche Einschränkungen auf die Query, z.B. Online-Status oder ein Embargo-Datum.
+
+- **Subject:** `rex_yform_manager_query`
+- **Params:** `table` (string), `field` (string, das URL-Feld), `slug` (string, der angeforderte Slug), `profile` (array, das komplette Profil)
+
+```php
+rex_extension::register('VIRTUAL_URLS_PROFILE_QUERY', function (rex_extension_point $ep) {
+    $query = $ep->getSubject();
+    if ('rex_news' === $ep->getParam('table')) {
+        $query->where('status', 1);
+    }
+    return $query;
+});
+```
+
+> Betrifft nur den regulären Slug-Lookup. Der Fallback über das numerische `-<id>`-Suffix (z.B. wenn zwei Datensätze denselben normalisierten Slug ergeben) fragt den Datensatz direkt per ID ab und durchläuft diese Query nicht.
+
+### `VIRTUAL_URLS_BUILD_URL`
+
+Läuft am Ende von `VirtualUrlsHelper::getUrl()`, nachdem die URL zusammengebaut wurde. Erlaubt Nachbearbeitung oder Ersetzung der generierten URL.
+
+- **Subject:** `string` (die generierte URL)
+- **Params:** `profile` (array), `dataset` (`rex_yform_manager_dataset`), `clang_id` (int)
+
+```php
+rex_extension::register('VIRTUAL_URLS_BUILD_URL', function (rex_extension_point $ep) {
+    $url = $ep->getSubject();
+    // z.B. Tracking-Parameter, alternative Slug-Schemata, ...
+    return $url;
+});
+```
+
+### `VIRTUAL_URLS_RESOLVED`
+
+Läuft, nachdem ein Request erfolgreich auf einen Datensatz aufgelöst wurde, bevor das Ergebnis an YRewrite zurückgegeben wird. Gedacht zum Reagieren (Logging, Tracking, zusätzliches Caching), nicht primär zum Verändern des Routings.
+
+- **Subject:** `array{article_id: int, clang?: int}`
+- **Params:** `dataset` (`rex_yform_manager_dataset`), `profile` (array), `domain` (`rex_yrewrite_domain`)
+
+```php
+rex_extension::register('VIRTUAL_URLS_RESOLVED', function (rex_extension_point $ep) {
+    $dataset = $ep->getParam('dataset');
+    // z.B. Aufrufzähler hochzählen, Analytics-Event feuern, ...
+    return $ep->getSubject();
+});
+```
 
 ## API-Referenz
 

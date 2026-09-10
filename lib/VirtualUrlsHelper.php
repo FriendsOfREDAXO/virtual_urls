@@ -8,6 +8,7 @@ use rex_escape;
 use rex_sql;
 use rex_string;
 use rex_addon;
+use rex_extension;
 use rex_extension_point;
 use rex_yform_manager_dataset;
 use rex_yform_manager_table;
@@ -580,10 +581,23 @@ class VirtualUrlsHelper
                 return null;
             }
 
-            return $baseUrl . '/' . $profile['trigger_segment'] . '/' . $relationSlug . '/' . $slug;
+            $url = $baseUrl . '/' . $profile['trigger_segment'] . '/' . $relationSlug . '/' . $slug;
+        } else {
+            $url = $baseUrl . '/' . $profile['trigger_segment'] . '/' . $slug;
         }
 
-        return $baseUrl . '/' . $profile['trigger_segment'] . '/' . $slug;
+        /**
+         * Erlaubt Drittanbieter-Code, die generierte URL nachzubearbeiten oder
+         * zu ersetzen (z.B. zusätzliche Pfadsegmente, alternative Slug-Schemata).
+         *
+         * Subject: string (die generierte URL)
+         * Params: profile, dataset, clang_id
+         */
+        return rex_extension::registerPoint(new rex_extension_point(
+            'VIRTUAL_URLS_BUILD_URL',
+            $url,
+            ['profile' => $profile, 'dataset' => $dataset, 'clang_id' => $clangId],
+        ));
     }
 
     /**

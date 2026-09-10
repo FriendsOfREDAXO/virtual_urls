@@ -35,7 +35,7 @@
 
         function fetchTableMeta(tableName) {
             if (!tableName) {
-                return Promise.resolve({ columns: [], relation_fields: {} });
+                return Promise.resolve({ columns: [], relation_fields: {}, lang_fields: [] });
             }
 
             var requestUrl = ajaxUrl + '&table=' + encodeURIComponent(tableName);
@@ -65,6 +65,50 @@
             select.removeAttribute('data-selected');
         }
 
+        // Markiert yform_lang_fields-Spalten (lang_text/lang_textarea/lang_media) mit
+        // einem Hinweis-Icon in den Optionen und blendet unter dem Select einen Hinweis
+        // ein, sobald so ein Feld ausgewählt ist: kein eigenes Slug-Feld nötig, Virtual
+        // Urls normalisiert den Wert der aktuellen Sprache automatisch.
+        function annotateLangFieldOptions(select, langFields) {
+            if (!select || !Array.isArray(langFields) || langFields.length === 0) {
+                return;
+            }
+
+            Array.from(select.options).forEach(function (option) {
+                if (langFields.indexOf(option.value) !== -1 && option.value !== '') {
+                    option.textContent = option.value + ' 🌐';
+                    option.setAttribute('data-lang-field', '1');
+                }
+            });
+        }
+
+        function ensureLangFieldHint(select) {
+            var hintId = select.id ? select.id + '-lang-hint' : null;
+            if (!hintId) {
+                return null;
+            }
+
+            var hint = document.getElementById(hintId);
+            if (!hint) {
+                hint = document.createElement('p');
+                hint.id = hintId;
+                hint.className = 'help-block text-info';
+                hint.style.display = 'none';
+                hint.textContent = '🌐 Mehrsprachiges Feld (yform_lang_fields): Virtual Urls nutzt automatisch den Wert der aktuellen Sprache. Ein eigenes Slug-Feld ist dafür nicht nötig.';
+                select.insertAdjacentElement('afterend', hint);
+            }
+            return hint;
+        }
+
+        function updateLangFieldHint(select) {
+            var hint = ensureLangFieldHint(select);
+            if (!hint) {
+                return;
+            }
+            var selectedOption = select.options[select.selectedIndex];
+            hint.style.display = (selectedOption && selectedOption.getAttribute('data-lang-field') === '1') ? '' : 'none';
+        }
+
         function loadColumns(tableName, selects) {
             if (!tableName) {
                 selects.forEach(function (select) {
@@ -76,11 +120,14 @@
             fetchTableMeta(tableName)
                 .then(function (meta) {
                     var columns = Array.isArray(meta.columns) ? meta.columns : [];
+                    var langFields = Array.isArray(meta.lang_fields) ? meta.lang_fields : [];
                     var items = columns.map(function (col) {
                         return { value: col, label: col };
                     });
                     selects.forEach(function (select) {
                         populateSelect(select, items, '- Bitte wählen -');
+                        annotateLangFieldOptions(select, langFields);
+                        updateLangFieldHint(select);
                     });
                 })
                 .catch(function () {
@@ -148,12 +195,15 @@
                 .then(function (meta) {
                     var columns = Array.isArray(meta.columns) ? meta.columns : [];
                     var relationMap = meta.relation_fields && typeof meta.relation_fields === 'object' ? meta.relation_fields : {};
+                    var langFields = Array.isArray(meta.lang_fields) ? meta.lang_fields : [];
 
                     var columnItems = columns.map(function (col) {
                         return { value: col, label: col };
                     });
                     mainSelects.forEach(function (select) {
                         populateSelect(select, columnItems, '- Bitte wählen -');
+                        annotateLangFieldOptions(select, langFields);
+                        updateLangFieldHint(select);
                     });
 
                     if (relationFieldSelect) {
@@ -182,6 +232,12 @@
         if (relationFieldSelect) {
             relationFieldSelect.addEventListener('change', updateRelationTableFromField);
         }
+
+        mainSelects.concat(relationSelects).forEach(function (select) {
+            select.addEventListener('change', function () {
+                updateLangFieldHint(select);
+            });
+        });
 
         if (tableSelect.value) {
             tableSelect.dispatchEvent(new Event('change'));

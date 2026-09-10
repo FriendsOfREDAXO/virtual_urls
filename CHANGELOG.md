@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0 - 2026-09-10
+
+### Added
+- Drei eigene Extension Points für Drittanbieter-Code, ohne Fork:
+  - `VIRTUAL_URLS_PROFILE_QUERY` – zusätzliche Einschränkungen auf die Lookup-Query bei der URL-Auflösung (z.B. Online-Status, Embargo-Datum).
+  - `VIRTUAL_URLS_BUILD_URL` – Nachbearbeitung/Ersetzung einer generierten URL.
+  - `VIRTUAL_URLS_RESOLVED` – Reaktion, nachdem ein Request erfolgreich auf einen Datensatz aufgelöst wurde (Logging, Tracking, ...).
+- Profil-Formular markiert `yform_lang_fields`-Felder (`lang_text`/`lang_textarea`/`lang_media`) in den Spalten-Dropdowns für URL-Feld und Relation-Slug-Feld mit 🌐 und zeigt einen Hinweis, dass dafür kein eigenes Slug-Feld benötigt wird.
+
 ## 1.3.0 - 2026-09-10
 
 ### Fixed
