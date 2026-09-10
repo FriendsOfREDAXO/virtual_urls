@@ -161,6 +161,11 @@ class VirtualUrls
             }
         }
 
+        // Keine URL passt zu einem aktuellen Datensatz - prüfen, ob es sich um
+        // einen früher gültigen (inzwischen geänderten) Slug handelt und ggf.
+        // per 301 auf die aktuelle URL weiterleiten.
+        VirtualUrlsRedirects::redirectIfOldSlug($profiles, $segments, $clangId);
+
         return null;
     }
     

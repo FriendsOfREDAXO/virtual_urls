@@ -306,6 +306,16 @@ online_date >= "###NOW -1 YEAR###"
 Das AddOn überwacht `YFORM_DATA_ADDED`, `YFORM_DATA_UPDATED` und `YFORM_DATA_DELETED`.
 Bei Änderungen an konfigurierten Quell- oder Relationstabellen wird der YRewrite-Cache automatisch invalidiert.
 
+## 301-Redirects bei geänderten Slugs
+
+Ändert sich der Wert des URL-Felds eines Datensatzes (z.B. weil der Titel angepasst wurde), ändert sich damit auch die URL. Ohne weitere Vorkehrung würde die alte URL für alle bestehenden Links, Backlinks und Suchmaschinen-Einträge ins Leere laufen (404).
+
+Virtual URLs merkt sich bei jeder Änderung automatisch den vorherigen, normalisierten Slug (`YFORM_DATA_UPDATED`). Lässt sich eine angefragte URL keinem aktuellen Datensatz zuordnen, wird als letzter Schritt in dieser Historie nachgeschaut — bei Treffer erfolgt ein echter `301 Moved Permanently` auf die aktuelle URL des Datensatzes.
+
+- Es wird nur der zuletzt gültige alte Slug pro Datensatz gespeichert (kein unbegrenzt wachsender Verlauf); jede weitere Änderung überschreibt den vorherigen Eintrag für denselben alten Slug.
+- Gilt pro Profil (Tabelle + Trigger + ggf. Relation-Slug) — bei mehreren Profilen für dieselbe Tabelle wird die Historie je Profil getrennt gehalten.
+- Ein manuell in der Datenbank gelöschter Datensatz hinterlässt einen inaktiven Eintrag in der Historie; der Redirect greift dann nicht mehr (der Datensatz lässt sich nicht mehr laden), es entsteht aber auch kein Fehler.
+
 ## System-Integration
 
 - Extension Point `YREWRITE_PREPARE` für URL-Auflösung

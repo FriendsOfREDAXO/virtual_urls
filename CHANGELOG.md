@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0 - 2026-09-10
+
+### Added
+- **301-Redirects bei geänderten Slugs:** Ändert sich der Wert des URL-Felds eines Datensatzes (z.B. der Titel), wurde die alte URL bisher zu einem 404. Virtual URLs merkt sich jetzt automatisch den vorherigen normalisierten Slug (bei `YFORM_DATA_UPDATED`) und leitet eine Anfrage auf die alte URL per echtem `301 Moved Permanently` auf die aktuelle URL weiter, sofern kein aktueller Datensatz mehr direkt passt. Neue Tabelle `virtual_urls_old_slugs`, ein Eintrag pro (Tabelle, Trigger, Relation-Slug, alter Slug) — jede erneute Änderung überschreibt den vorherigen Eintrag.
+
 ## 1.5.0 - 2026-09-10
 
 ### Added
