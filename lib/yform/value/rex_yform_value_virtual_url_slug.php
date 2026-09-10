@@ -13,7 +13,11 @@ class rex_yform_value_virtual_url_slug extends rex_yform_value_abstract
         // Find the source field value in the email/db object
         foreach ($this->params['values'] as $value) {
             if ($value->getName() == $sourceField) {
-                $sourceValue = $value->getValue();
+                // Falls source_field ein yform_lang_fields-Feld ist (lang_text/lang_textarea),
+                // liegt hier zu diesem Zeitpunkt entweder das rohe POST-Array oder ein JSON-String
+                // vor. resolveRawValue() löst beides auf die aktuelle Sprache auf; für normale
+                // Felder wird der Wert unverändert durchgereicht.
+                $sourceValue = \FriendsOfRedaxo\VirtualUrl\VirtualUrlsHelper::resolveRawValue($value->getValue());
                 break;
             }
         }

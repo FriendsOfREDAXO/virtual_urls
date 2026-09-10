@@ -26,6 +26,53 @@ class VirtualUrlsHelper
     /** @var list<array<string, mixed>>|null aktive Profile, siehe getAllProfiles() */
     private static ?array $profileCache = null;
 
+    /** @var bool|null Cache, ob das AddOn yform_lang_fields installiert & aktiviert ist */
+    private static ?bool $langFieldsAvailable = null;
+
+    /**
+     * Liest einen Datensatz-Feldwert (YOrm-Dataset) als String, auflösend für die
+     * aktuelle (bzw. übergebene) Sprache, falls es sich um ein yform_lang_fields-Feld
+     * (lang_text/lang_textarea/lang_media) handelt.
+     */
+    public static function resolveFieldValue(rex_yform_manager_dataset $dataset, string $field, int $clangId = -1): string
+    {
+        return self::resolveRawValue($dataset->getValue($field), $clangId);
+    }
+
+    /**
+     * Wie resolveFieldValue(), aber für einen bereits gelesenen Rohwert, z.B. aus
+     * rex_sql::getValue() (Sitemap-Generierung iteriert direkt über SQL-Zeilen,
+     * nicht über YOrm-Datasets). Ist yform_lang_fields nicht installiert oder der
+     * Wert kein lang-field-JSON, wird der Rohwert unverändert als String
+     * zurückgegeben (Bestandsverhalten).
+     *
+     * @param mixed $raw
+     */
+    public static function resolveRawValue($raw, int $clangId = -1): string
+    {
+        if (self::isLangFieldsAvailable() && is_string($raw)) {
+            $normalized = \KLXM\YformLangFields\LangHelper::normalizeLanguageData($raw);
+            if ([] !== $normalized) {
+                if ($clangId < 0) {
+                    $clangId = rex_clang::getCurrentId();
+                }
+                return \KLXM\YformLangFields\LangHelper::getValueForLanguage($raw, $clangId);
+            }
+        }
+
+        return is_scalar($raw) ? (string) $raw : '';
+    }
+
+    private static function isLangFieldsAvailable(): bool
+    {
+        if (null === self::$langFieldsAvailable) {
+            self::$langFieldsAvailable = rex_addon::get('yform_lang_fields')->isAvailable()
+                && class_exists(\KLXM\YformLangFields\LangHelper::class);
+        }
+
+        return self::$langFieldsAvailable;
+    }
+
     /**
      * Erzeugt die vollständige URL für einen Datensatz.
      *
@@ -99,7 +146,7 @@ class VirtualUrlsHelper
         if ($label === '') {
             $dataset = rex_yform_manager_dataset::get($datasetId, $table);
             $profile = self::getProfileByTable($table, $clangId);
-            $label = $dataset !== null && $profile !== null ? $dataset->getValue($profile['url_field']) : $url;
+            $label = $dataset !== null && $profile !== null ? self::resolveFieldValue($dataset, $profile['url_field'], $clangId) : $url;
         }
 
         $attrs = '';
@@ -566,7 +613,7 @@ class VirtualUrlsHelper
             return null;
         }
 
-        $value = (string) $rows[0][$slugField];
+        $value = self::resolveRawValue($rows[0][$slugField]);
         return self::buildNormalizedSlug($value, $id);
     }
 
@@ -581,7 +628,7 @@ class VirtualUrlsHelper
         );
 
         foreach ($rows as $row) {
-            $normalized = self::buildNormalizedSlug((string) $row[$slugField], (int) $row['id']);
+            $normalized = self::buildNormalizedSlug(self::resolveRawValue($row[$slugField]), (int) $row['id']);
             if ($normalized === $slug) {
                 return (int) $row['id'];
             }
@@ -592,7 +639,7 @@ class VirtualUrlsHelper
 
     public static function buildSlugSegment(rex_yform_manager_dataset $dataset, string $field): ?string
     {
-        $value = (string) $dataset->getValue($field);
+        $value = self::resolveFieldValue($dataset, $field);
         return self::buildNormalizedSlug($value, $dataset->getId());
     }
 

@@ -101,6 +101,10 @@ Für mehrsprachige Seiten pro Sprache ein eigenes Profil anlegen:
 
 Das Routing filtert automatisch nach der aktuellen Sprache. Der Helper nutzt immer das sprachspezifische Profil und fällt auf „Alle Sprachen" zurück.
 
+**Alternative: ein Feld für alle Sprachen (`yform_lang_fields`)**
+
+Ist das AddOn [`yform_lang_fields`](https://github.com/KLXM/yform_lang_fields) installiert, kann statt separater Spalten pro Sprache (`slug_de`, `slug_en`, …) auch ein einzelnes `lang_text`/`lang_textarea`/`lang_media`-Feld als URL-Slug-, SEO-Title-/-Description-/-Image- oder Relation-Slug-Feld ausgewählt werden. Virtual URLs löst den JSON-Wert dieser Felder automatisch für die jeweils aktuelle Sprache auf (Routing, URL-Erzeugung, SEO-Tags und Sitemap). Ohne `yform_lang_fields` bleibt das Verhalten für normale Felder unverändert.
+
 ### 4. Relation-URLs
 
 Für hierarchische URLs (z.B. `/news/sport/mein-artikel`):
@@ -183,6 +187,44 @@ echo rex_getUrl('', '', ['news-id' => 42, 'page' => 2]); // weitere Parameter we
 
 Bei mehreren Profilen mit gleichem Trigger (Multi-Domain, Mehrsprachigkeit) entscheiden aktuelle Domain und Sprache.
 
+### Mehrere Profile pro Tabelle (Multi-Domain, Mehrsprachigkeit)
+
+Eine Tabelle kann mehrere Profile haben, etwa je Domain oder je Sprache. `getUrl()` wählt automatisch das passende Profil: aktuelle Domain und Sprache zuerst, dann domainunabhängige Profile. Wer ein bestimmtes Profil braucht, etwa ein Link-Picker mit Auswahl, nutzt die Profil-API:
+
+```php
+use FriendsOfRedaxo\VirtualUrl\VirtualUrlsHelper;
+
+// Alle aktiven Profile einer Tabelle (Zeilen aus rex_virtual_urls_profiles)
+foreach (VirtualUrlsHelper::getProfilesByTable('rex_news') as $profile) {
+    echo $profile['id'] . ': /' . $profile['trigger_segment'] . '/ → Artikel ' . $profile['article_id']
+        . ' (' . ($profile['domain'] ?: 'alle Domains') . ', clang ' . $profile['clang_id'] . ')';
+    // -1 bei clang_id bzw. '' bei domain = gilt überall
+}
+
+// URL über genau dieses Profil, unabhängig von der aktuellen Domain
+$profile = VirtualUrlsHelper::getProfileById(3);
+$url = $profile ? VirtualUrlsHelper::getUrlByProfile($profile, 42) : null;
+// → null, wenn der Datensatz fehlt, kein Slug hat oder das Profil eine andere Sprache hat
+
+// Alle URLs eines Datensatzes, z. B. für hreflang oder eine Auswahl im Backend
+foreach (VirtualUrlsHelper::getUrls('rex_news', 42) as $entry) {
+    echo $entry['profile']['domain'] . ': ' . $entry['url'];
+    // Profil ohne Domain-Bindung liefert die URL der aktuellen Domain
+}
+
+// Profil gezielt nach Domain wählen (Default: aktuelle yrewrite-Domain)
+$profile = VirtualUrlsHelper::getProfileByTable('rex_news', 1, 'shop.example.org');
+// Reihenfolge: Domain + Sprache, Domain + alle Sprachen, alle Domains + Sprache, alle Domains + alle Sprachen
+```
+
+Typischer Einsatz in einem Template mit zwei Domains, die dieselbe News-Tabelle anzeigen:
+
+```php
+// Kanonische URL auf der Hauptdomain, unabhängig davon, wo gerade gerendert wird
+$main = VirtualUrlsHelper::getProfileByTable('rex_news', rex_clang::getCurrentId(), 'www.example.org');
+$canonical = $main ? VirtualUrlsHelper::getUrlByProfile($main, $dataset->getId()) : null;
+```
+
 ### URL programmatisch testen
 
 ```php
@@ -252,6 +294,7 @@ Bei Änderungen an konfigurierten Quell- oder Relationstabellen wird der YRewrit
 - Extension Point `YREWRITE_PREPARE` für URL-Auflösung
 - Extension Point `YREWRITE_DOMAIN_SITEMAP` für Sitemap-Einträge
 - Benötigt: YRewrite ≥ 2.0, YForm ≥ 4.0, REDAXO ≥ 5.10
+- Optional: [`yform_lang_fields`](https://github.com/KLXM/yform_lang_fields) – wenn installiert, werden `lang_text`/`lang_textarea`/`lang_media`-Felder überall dort, wo Virtual URLs einen Feldwert als String benötigt (URL-Slug, Relation-Slug, SEO-Title/-Description/-Image), automatisch für die aktuelle Sprache aufgelöst
 
 ## API-Referenz
 
@@ -275,9 +318,9 @@ Bei Änderungen an konfigurierten Quell- oder Relationstabellen wird der YRewrit
 | `getProfilesByTable(string $table): array` | Alle aktiven Profile einer Tabelle |
 | `getProfileById(int $id): ?array` | Aktives Profil per ID |
 | `getProfileByTable(string $table, int $clang = -1, ?string $domain = null): ?array` | Profil nach Tabelle, Sprache und Domain (Default: aktuelle yrewrite-Domain) |
+| `handleUrlRewrite(rex_extension_point $ep): ?string` | `URL_REWRITE`-Hook für `rex_getUrl('', '', ['<trigger>-id' => $id])` (wird in boot.php registriert) |
 | `testUrl(string $url, ?string $domain): array` | URL testen |
-| `getProfileByTable(string $table, int $clang = -1): ?array` | Profil für Tabelle+Sprache |
-| `getAllProfiles(): array` | Alle Profile |
+| `getAllProfiles(): array` | Alle aktiven Profile (gecacht) |
 | `clearCache(): void` | Profil-Cache leeren |
 
 ## Autor

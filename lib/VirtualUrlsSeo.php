@@ -43,7 +43,7 @@ class VirtualUrlsSeo
         // 2. Title
         $titleField = $profile['seo_title_field'] ?? '';
         if ($titleField && $dataset->hasValue($titleField)) {
-            $title = $dataset->getValue($titleField);
+            $title = VirtualUrlsHelper::resolveFieldValue($dataset, $titleField);
             if ($title) {
                 $title = rex_escape(strip_tags($title));
                 $tags['title'] = '<title>' . $title . '</title>';
@@ -55,7 +55,7 @@ class VirtualUrlsSeo
         // 3. Description
         $descField = $profile['seo_description_field'] ?? '';
         if ($descField && $dataset->hasValue($descField)) {
-            $description = $dataset->getValue($descField);
+            $description = VirtualUrlsHelper::resolveFieldValue($dataset, $descField);
             if ($description) {
                 // Strip tags and truncate to ~160 chars
                 $description = strip_tags($description);
@@ -74,7 +74,7 @@ class VirtualUrlsSeo
         // 4. Image
         $imageField = $profile['seo_image_field'] ?? '';
         if ($imageField && $dataset->hasValue($imageField)) {
-            $image = $dataset->getValue($imageField);
+            $image = VirtualUrlsHelper::resolveFieldValue($dataset, $imageField);
             if ($image) {
                 // Handle comma-separated list (e.g. from media list)
                 $images = explode(',', $image);
