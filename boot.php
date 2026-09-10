@@ -3,6 +3,7 @@
 use FriendsOfRedaxo\VirtualUrl\VirtualUrls;
 use FriendsOfRedaxo\VirtualUrl\VirtualUrlsCache;
 use FriendsOfRedaxo\VirtualUrl\VirtualUrlsHelper;
+use FriendsOfRedaxo\VirtualUrl\VirtualUrlsRedirects;
 use FriendsOfRedaxo\VirtualUrl\VirtualUrlsSeo;
 use FriendsOfRedaxo\VirtualUrl\VirtualUrlsSitemap;
 
@@ -14,6 +15,10 @@ if (rex::isBackend() && rex_be_controller::getCurrentPagePart(1) === 'virtual_ur
 if (rex_addon::get('yform')->isAvailable()) {
     // 2. Register Cache Buster (Global, needed in Backend mainly)
     VirtualUrlsCache::init();
+
+    // Alte Slugs mitschreiben (Datensätze werden i.d.R. im Backend bearbeitet,
+    // daher unabhängig von rex::isBackend() registrieren).
+    VirtualUrlsRedirects::init();
 }
 
 // 3. Frontend / YRewrite integration
