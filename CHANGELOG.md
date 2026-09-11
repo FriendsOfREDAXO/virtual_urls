@@ -1,9 +1,14 @@
 # Changelog
 
+## 1.6.3 - 2026-09-11
+
+### Docs
+- Einordnung ggü. dem URL-AddOn in 1.6.2 korrigiert: Beide Addons erlauben mehrere Profile pro Tabelle, das ist kein Unterschied. Der eigentliche Unterschied ist, dass das URL-AddOn jede URL fest an die tatsächliche Struktur-Position des Profil-Artikels koppelt und pro Datensatz in einer eigenen Tabelle vorgeneriert/speichert, während Virtual URLs keine URLs speichert und den Trigger unabhängig von einer Artikel-Position zur Laufzeit im Pfad erkennt.
+
 ## 1.6.2 - 2026-09-11
 
 ### Docs
-- README erklärt jetzt anhand von Beispielen, dass der Trigger frei im URL-Pfad platzierbar ist (nicht nur am Anfang), und wie sich darüber dieselbe YForm-Tabelle über mehrere Profile an verschiedenen Stellen der Website einhängen lässt (z.B. eine News-Tabelle gleichzeitig im allgemeinen News-Bereich und in mehreren thematischen Unterbereichen, jeweils mit eigenem Layout). Einordnung ggü. dem URL-AddOn entsprechend präzisiert.
+- README erklärt jetzt anhand von Beispielen, dass der Trigger frei im URL-Pfad platzierbar ist (nicht nur am Anfang), und wie sich darüber dieselbe YForm-Tabelle über mehrere Profile an verschiedenen Stellen der Website einhängen lässt (z.B. eine News-Tabelle gleichzeitig im allgemeinen News-Bereich und in mehreren thematischen Unterbereichen, jeweils mit eigenem Layout).
 
 ## 1.6.1 - 2026-09-10
 

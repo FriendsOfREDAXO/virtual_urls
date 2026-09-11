@@ -29,7 +29,9 @@ Dieses AddOn ist keine Ersatzlösung für das URL-AddOn.
 Es ist bewusst auf YForm-basierte Routing-Profile zugeschnitten und deckt damit einen klar abgegrenzten Einsatzbereich ab.
 Das URL-AddOn ist weitaus universeller anzusehen.
 
-**Wesentlicher Unterschied:** Beim URL-AddOn ist ein Profil an genau eine feste `article_id` gebunden – ein Datensatz hat eine Adresse. Virtual URLs erlaubt dagegen **mehrere Profile pro Tabelle**, jedes mit eigenem Trigger und eigenem Renderer-Artikel (siehe [„Dieselbe Tabelle an mehreren Stellen einhängen"](#dieselbe-tabelle-an-mehreren-stellen-einhängen)). Das ist der typische Fall, wenn dieselbe News gleichzeitig in einem allgemeinen News-Bereich UND in mehreren thematischen Unterbereichen der Website auftauchen soll, jeweils mit eigenem Layout – ohne den Datensatz zu duplizieren.
+**Wesentlicher Unterschied:** Das URL-AddOn koppelt jede erzeugte URL fest an die tatsächliche Position des Profil-Artikels im Struktur-Baum – die URL ist `<echter Struktur-Pfad des Artikels>/<Datensatz-Segment>` und wird pro Datensatz in einer eigenen Tabelle (`url_generator_url`) vorgeneriert und gespeichert. Verschiebt sich der Artikel im Baum, ändert sich die URL entsprechend, und die gespeicherten Einträge müssen neu generiert werden.
+
+Virtual URLs speichert keine URLs und ist nicht an eine Artikel-Position gebunden: Der Trigger wird zur Laufzeit irgendwo im angeforderten Pfad gesucht (siehe oben), unabhängig davon, ob davor ein echter, im Struktur-Baum existierender Artikel-Pfad steht. Dadurch lässt sich derselbe Trigger unter beliebig vielen „Wurzel-Pfaden" ansprechen, und mehrere Profile auf derselben Tabelle mit unterschiedlichen Triggern erlauben es, denselben Datensatz an mehreren Stellen der Website mit jeweils eigenem Renderer-Artikel/Layout auftauchen zu lassen – ohne Duplikat, ohne Neu-Generierung, ohne eigene URL-Tabelle (siehe [„Dieselbe Tabelle an mehreren Stellen einhängen"](#dieselbe-tabelle-an-mehreren-stellen-einhängen)).
 
 
 ## Konzept
