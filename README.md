@@ -29,6 +29,8 @@ Dieses AddOn ist keine Ersatzlösung für das URL-AddOn.
 Es ist bewusst auf YForm-basierte Routing-Profile zugeschnitten und deckt damit einen klar abgegrenzten Einsatzbereich ab.
 Das URL-AddOn ist weitaus universeller anzusehen.
 
+**Wesentlicher Unterschied:** Beim URL-AddOn ist ein Profil an genau eine feste `article_id` gebunden – ein Datensatz hat eine Adresse. Virtual URLs erlaubt dagegen **mehrere Profile pro Tabelle**, jedes mit eigenem Trigger und eigenem Renderer-Artikel (siehe [„Dieselbe Tabelle an mehreren Stellen einhängen"](#dieselbe-tabelle-an-mehreren-stellen-einhängen)). Das ist der typische Fall, wenn dieselbe News gleichzeitig in einem allgemeinen News-Bereich UND in mehreren thematischen Unterbereichen der Website auftauchen soll, jeweils mit eigenem Layout – ohne den Datensatz zu duplizieren.
+
 
 ## Konzept
 
@@ -44,6 +46,21 @@ Das URL-AddOn ist weitaus universeller anzusehen.
 |---|---|---|
 | Ohne Relation | `/<pfad>/<trigger>/<slug>` | `/spielberechtigungen/xnews/mein-artikel` |
 | Mit Relation | `/<pfad>/<trigger>/<relation-slug>/<slug>` | `/spielberechtigungen/xnews/sport/mein-artikel` |
+
+### Der Trigger ist frei im Pfad platzierbar
+
+Der Trigger wird nicht nur am Anfang der URL gesucht, sondern irgendwo in den Pfad-Segmenten (`array_search`). Das bedeutet: `<pfad>` davor ist beliebig lang und beliebig tief – solange direkt nach dem Trigger die passende Anzahl Segmente folgt (Slug, bzw. Relation-Slug + Slug) und danach nichts mehr kommt, matcht das Profil. Alle folgenden URLs matchen z.B. dasselbe Profil mit Trigger `news`:
+
+```
+/news/mein-artikel
+/aktuelles/news/mein-artikel
+/verein/fc-bayern/news/mein-artikel
+/2026/saison/news/mein-artikel
+```
+
+Das ist der Grund, warum sich dieselbe Datenquelle mühelos an mehreren Stellen im Seitenbaum einhängen lässt, ohne den Datensatz zu duplizieren – siehe [„Dieselbe Tabelle an mehreren Stellen einhängen"](#dieselbe-tabelle-an-mehreren-stellen-einhängen) unten.
+
+**Einschränkung:** Der Trigger muss innerhalb der für Domain/Sprache gültigen Profile eindeutig sein. Zwei aktive Profile mit demselben Trigger-Wort würden sich gegenseitig ins Gehege kommen – es gewinnt das erste in der internen Profil-Liste gefundene.
 
 ## Einrichtung
 
@@ -245,6 +262,39 @@ Typischer Einsatz in einem Template mit zwei Domains, die dieselbe News-Tabelle 
 $main = VirtualUrlsHelper::getProfileByTable('rex_news', rex_clang::getCurrentId(), 'www.example.org');
 $canonical = $main ? VirtualUrlsHelper::getUrlByProfile($main, $dataset->getId()) : null;
 ```
+
+### Dieselbe Tabelle an mehreren Stellen einhängen
+
+Ein klassischer Fall: Eine News-Tabelle soll gleichzeitig in einem allgemeinen News-Bereich UND in mehreren thematischen Unterbereichen auftauchen, ohne die Datensätze zu duplizieren. Das löst man nicht über Relationen, sondern einfach über **mehrere Profile** auf derselben Tabelle mit **unterschiedlichen Triggern** und unterschiedlichem Renderer-Artikel:
+
+| Profil | Trigger | Renderer-Artikel | Resultierende URL (Datensatz 42) |
+|---|---|---|---|
+| Allgemein | `news` | Artikel 10 (allg. News-Layout) | `/news/mein-artikel-42` |
+| Sport | `sport-news` | Artikel 22 (Sport-Layout, eigene Sidebar) | `/sport/sport-news/mein-artikel-42` |
+| Kreisliga | `kreisliga-news` | Artikel 35 (Kreisliga-Layout) | `/kreisliga/kreisliga-news/mein-artikel-42` |
+
+Der Datensatz mit `id=42` existiert nur **einmal** in `rex_news`. Über drei Profile ist er trotzdem unter drei verschiedenen URLs mit drei verschiedenen Layouts erreichbar – jedes Profil zeigt auf einen eigenen Renderer-Artikel, liest aber dieselbe Zeile. Ändert sich Titel oder Text, ist die Änderung sofort an allen drei Stellen sichtbar, ohne Sync-Logik.
+
+```php
+// Alle drei URLs desselben Datensatzes ermitteln, z.B. für eine Übersicht im Backend
+foreach (VirtualUrlsHelper::getUrls('rex_news', 42) as $entry) {
+    echo $entry['profile']['trigger_segment'] . ': ' . $entry['url'];
+}
+// news: /news/mein-artikel-42
+// sport-news: /sport/sport-news/mein-artikel-42
+// kreisliga-news: /kreisliga/kreisliga-news/mein-artikel-42
+```
+
+Auf der jeweiligen Bereichsseite selbst reicht ein einfacher Link mit dem passenden Trigger:
+
+```php
+// Im Sport-Bereich: Link zur Sport-Ansicht derselben News
+echo VirtualUrlsHelper::getLink('rex_news', 42, 'Zum Artikel');
+// nutzt automatisch das Profil, das zur aktuellen Domain/Sprache passt -
+// bei mehreren passenden Profilen ggf. gezielt per getProfileById()/getUrlByProfile() wählen
+```
+
+Sitemap und SEO-Tags laufen pro Profil getrennt – die Sport-URL bekommt ihre eigene Sitemap-Priorität/-Changefreq und eigene Meta-Tags, obwohl der Inhalt mit der allgemeinen News-URL identisch ist.
 
 ### URL programmatisch testen
 

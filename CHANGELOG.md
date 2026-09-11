@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.2 - 2026-09-11
+
+### Docs
+- README erklärt jetzt anhand von Beispielen, dass der Trigger frei im URL-Pfad platzierbar ist (nicht nur am Anfang), und wie sich darüber dieselbe YForm-Tabelle über mehrere Profile an verschiedenen Stellen der Website einhängen lässt (z.B. eine News-Tabelle gleichzeitig im allgemeinen News-Bereich und in mehreren thematischen Unterbereichen, jeweils mit eigenem Layout). Einordnung ggü. dem URL-AddOn entsprechend präzisiert.
+
 ## 1.6.1 - 2026-09-10
 
 ### Docs
